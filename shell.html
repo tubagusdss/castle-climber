@@ -1,0 +1,341 @@
+<title>Castle Climber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --red:    #ef476f;
+    --gold:   #ffd166;
+    --mint:   #06d6a0;
+    --sky:    #4cc9f0;
+    --grape:  #9b5de5;
+    --cream:  #fff3dc;
+    --ink:    #1b1240;
+    --ink-2:  #2b1b4a;
+    --panel:  rgba(27, 18, 64, 0.78);
+    --edge:   rgba(255, 243, 220, 0.22);
+    --display: 'Bungee', 'Arial Black', sans-serif;
+    --body: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--body);
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #stage canvas:active { cursor: grabbing; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+
+  .stats {
+    position: absolute; top: 18px; left: 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .stat {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px 9px 12px;
+    background: var(--panel);
+    border: 2px solid var(--edge);
+    border-radius: 14px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.28);
+  }
+  .stat .icon {
+    width: 26px; height: 26px; display: grid; place-items: center;
+    font-size: 16px; line-height: 1;
+  }
+  .stat .label {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    opacity: 0.66; font-weight: 600;
+  }
+  .stat .value {
+    font-family: var(--display);
+    font-size: 19px; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .value small { font-family: var(--body); font-size: 12px; opacity: 0.6; font-weight: 500; }
+  .stat.gems .value { color: var(--gold); }
+  .stat.time .value { color: var(--sky); }
+
+  /* ---------- climb gauge: a little tower on the right edge ---------- */
+  .gauge {
+    position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .gauge .cap {
+    width: 30px; height: 14px;
+    background: repeating-linear-gradient(90deg, var(--cream) 0 6px, transparent 6px 10px);
+    border-radius: 2px;
+  }
+  .gauge .track {
+    position: relative;
+    width: 18px; height: min(46vh, 320px);
+    background: var(--panel);
+    border: 2px solid var(--edge);
+    border-radius: 9px;
+    overflow: visible;
+  }
+  .gauge .fill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, var(--gold), var(--mint) 55%, var(--sky));
+    border-radius: 0 0 7px 7px;
+    height: 0%;
+    transition: height 0.12s linear;
+  }
+  .gauge .ticks { position: absolute; inset: 0; }
+  .gauge .ticks i {
+    position: absolute; left: -5px; right: -5px; height: 2px;
+    background: rgba(255, 243, 220, 0.28);
+  }
+  .gauge .pip {
+    position: absolute; left: 50%; bottom: 0%;
+    width: 30px; height: 30px; margin-left: -15px; margin-bottom: -15px;
+    transition: bottom 0.12s linear;
+  }
+  .gauge .pip::after {
+    content: ''; position: absolute; inset: 6px;
+    background: var(--cream); border: 3px solid var(--ink);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--gold);
+  }
+  .gauge .foot {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    opacity: 0.66; font-weight: 600;
+  }
+
+  /* ---------- hints ---------- */
+  .hints {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    max-width: 92vw;
+  }
+  .hint {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px;
+    background: var(--panel); border: 2px solid var(--edge);
+    border-radius: 11px; font-size: 12px; font-weight: 500;
+    backdrop-filter: blur(6px);
+  }
+  kbd {
+    font-family: var(--display); font-size: 10px;
+    background: var(--cream); color: var(--ink);
+    padding: 3px 7px; border-radius: 5px;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  #toast {
+    position: absolute; top: 84px; left: 50%; transform: translate(-50%, -10px);
+    padding: 10px 20px; border-radius: 12px;
+    background: var(--red); color: var(--cream);
+    font-family: var(--display); font-size: 14px;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+    opacity: 0; transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- cards ---------- */
+  .scrim {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    background: radial-gradient(120% 90% at 50% 0%, rgba(76, 201, 240, 0.35), rgba(27, 18, 64, 0.88));
+    backdrop-filter: blur(3px);
+    transition: opacity 0.35s ease;
+  }
+  .scrim.hidden { opacity: 0; pointer-events: none; }
+
+  .card {
+    width: min(560px, 90vw);
+    padding: 34px 34px 30px;
+    background: var(--ink);
+    border: 3px solid var(--edge);
+    border-radius: 22px;
+    box-shadow: 0 18px 0 rgba(0, 0, 0, 0.35), inset 0 0 0 6px rgba(255, 243, 220, 0.05);
+    text-align: center;
+    position: relative;
+  }
+  /* crenellated top edge, like the battlements */
+  .card::before {
+    content: ''; position: absolute; left: 16px; right: 16px; top: -17px; height: 16px;
+    background: repeating-linear-gradient(90deg, var(--ink) 0 22px, transparent 22px 36px);
+    border-top: 3px solid var(--edge);
+  }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600; margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(34px, 7vw, 54px);
+    line-height: 0.95; margin: 0 0 6px;
+    text-wrap: balance;
+    color: var(--cream);
+    text-shadow: 0 4px 0 var(--red), 0 8px 0 rgba(0, 0, 0, 0.3);
+  }
+  h1 .accent { color: var(--gold); }
+  .lede {
+    margin: 14px auto 22px; max-width: 42ch;
+    font-size: 15px; line-height: 1.6; color: rgba(255, 243, 220, 0.82);
+  }
+  .keys {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px;
+  }
+  .keys .hint { background: rgba(255, 243, 220, 0.07); }
+
+  button {
+    font-family: var(--display); font-size: 17px;
+    color: var(--ink); background: var(--gold);
+    border: none; border-radius: 14px;
+    padding: 15px 34px; cursor: pointer;
+    box-shadow: 0 6px 0 #c79a34;
+    transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+  }
+  button:hover { background: #ffdd8a; }
+  button:active { transform: translateY(4px); box-shadow: 0 2px 0 #c79a34; }
+  button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+
+  #winCard { display: none; }
+  #winCard.show { display: grid; }
+  .score {
+    display: flex; justify-content: center; gap: 12px; margin: 6px 0 24px; flex-wrap: wrap;
+  }
+  .score div {
+    flex: 1 1 120px; padding: 14px 10px;
+    background: rgba(255, 243, 220, 0.07);
+    border: 2px solid var(--edge); border-radius: 14px;
+  }
+  .score b {
+    display: block; font-family: var(--display); font-size: 24px;
+    font-variant-numeric: tabular-nums; color: var(--gold);
+  }
+  .score span {
+    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.66;
+  }
+
+  /* ---------- touch controls ---------- */
+  #stick, #jumpBtn { display: none; }
+  body.touch #jumpBtn { display: grid; }
+  #stick {
+    position: fixed; width: 108px; height: 108px; margin: -54px 0 0 -54px;
+    border: 3px solid rgba(255, 243, 220, 0.35); border-radius: 50%;
+    background: rgba(27, 18, 64, 0.35); z-index: 6; pointer-events: none;
+  }
+  #stick.on { display: block; }
+  #knob {
+    position: absolute; left: 50%; top: 50%; width: 46px; height: 46px;
+    margin: 0; transform: translate(-50%, -50%);
+    background: var(--cream); border-radius: 50%; opacity: 0.85;
+  }
+  #jumpBtn {
+    position: fixed; right: 26px; bottom: 42px;
+    width: 96px; height: 96px; place-items: center;
+    border-radius: 50%; z-index: 6;
+    background: var(--mint); color: var(--ink);
+    font-family: var(--display); font-size: 15px;
+    border: none; box-shadow: 0 6px 0 #059c76;
+  }
+  body.touch .hints { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; }
+  }
+  @media (max-width: 560px) {
+    .stats { top: 12px; left: 12px; }
+    .gauge { right: 12px; }
+  }
+</style>
+
+<div id="stage"></div>
+
+<div id="hud">
+  <div class="stats">
+    <div class="stat gems">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 3h10l4 6-9 12L3 9z" fill="#ffd166" stroke="#1b1240" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 9h18M12 21 7 3M12 21l5-18" stroke="#1b1240" stroke-width="1.1" fill="none"/></svg>
+      </span>
+      <span>
+        <span class="label">Gems</span><br>
+        <span class="value"><span id="gemCount">0</span><small> / <span id="gemTotal">0</span></small></span>
+      </span>
+    </div>
+    <div class="stat time">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="13" r="8.2" fill="none" stroke="#4cc9f0" stroke-width="2"/><path d="M12 8.6V13l3 2.2" fill="none" stroke="#4cc9f0" stroke-width="2" stroke-linecap="round"/><path d="M9.4 2.6h5.2" stroke="#4cc9f0" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <span>
+        <span class="label">Time</span><br>
+        <span class="value" id="timeVal">0:00</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="gauge">
+    <div class="cap"></div>
+    <div class="track">
+      <div class="fill" id="gaugeFill"></div>
+      <div class="ticks">
+        <i style="bottom:25%"></i><i style="bottom:50%"></i><i style="bottom:75%"></i>
+      </div>
+      <div class="pip" id="gaugePip"></div>
+    </div>
+    <div class="foot"><span id="heightVal">0</span> m</div>
+  </div>
+
+  <div class="hints">
+    <span class="hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Run</span>
+    <span class="hint"><kbd>Space</kbd> Jump &middot; twice to flip</span>
+    <span class="hint"><kbd>Shift</kbd> Sprint</span>
+    <span class="hint"><kbd>Mouse</kbd> Look</span>
+    <span class="hint"><kbd>R</kbd> Restart</span>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<div id="stick"><div id="knob"></div></div>
+<button id="jumpBtn">JUMP</button>
+
+<div class="scrim" id="overlay">
+  <div class="card">
+    <div class="eyebrow">Climb the candy keep</div>
+    <h1>Castle <span class="accent">Climber</span></h1>
+    <p class="lede">Race up the spiral stair, hop the floating blocks, and grab the golden crown at the very top. Miss a jump and you pop back to the last block you stood on &mdash; so keep going.</p>
+    <div class="keys">
+      <span class="hint"><kbd>WASD</kbd> Run</span>
+      <span class="hint"><kbd>Space</kbd> Jump</span>
+      <span class="hint"><kbd>Space</kbd><kbd>Space</kbd> Double jump</span>
+      <span class="hint"><kbd>Shift</kbd> Sprint</span>
+    </div>
+    <button id="startBtn">Start climbing</button>
+  </div>
+</div>
+
+<div class="scrim" id="winCard">
+  <div class="card">
+    <div class="eyebrow">You reached the top</div>
+    <h1>Crown <span class="accent">Claimed</span></h1>
+    <div class="score">
+      <div><b id="winTime">0:00</b><span>Time</span></div>
+      <div><b id="winGems">0</b><span>Gems</span></div>
+      <div><b id="winFalls">0</b><span>Falls</span></div>
+    </div>
+    <button id="againBtn">Climb again</button>
+  </div>
+</div>
+
+<script type="module">
+__THREE__
+__GAME__
+</script>
