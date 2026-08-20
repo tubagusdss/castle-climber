@@ -543,16 +543,14 @@ function pointSolid(v) {
 function findTarget() {
   const p = player;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  const ox = p.pos.x + Math.cos(yaw) * SHOULDER;      // the reticle sights down the shoulder line
-  const oy = p.pos.y + 0.25;
-  const oz = p.pos.z - Math.sin(yaw) * SHOULDER;
-  let best = null, bestDot = 0.86;
+  const ox = p.pos.x, oy = p.pos.y + 0.25, oz = p.pos.z;
+  let best = null, bestDot = 0.78;                   // roughly a 38 degree cone
   for (const e of enemies) {
     if (e.dead) continue;
     const dx = e.obj.position.x - ox, dz = e.obj.position.z - oz;
     const dy = e.obj.position.y + e.height * 0.55 - oy;
     const d = Math.hypot(dx, dy, dz);
-    if (d > 22) continue;
+    if (d > 28) continue;
     const dot = (dx / d) * fx + (dz / d) * fz;
     if (dot > bestDot) { bestDot = dot; best = { e, d, dir: { x: dx / d, y: dy / d, z: dz / d } }; }
   }
@@ -570,10 +568,9 @@ function fireRepulsor() {
   const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
   _mz.set(p.pos.x + fx * 0.7, p.pos.y + 0.25, p.pos.z + fz * 0.7);   // palm muzzle
 
-  // Send the bolt through the point the reticle covers, so what you see under
-  // the lock marker sits on is what you hit, and a lock overrides with a homing line.
-  _aim.copy(camTarget).sub(camera.position).normalize();
-  _aim.multiplyScalar(38).add(camera.position).sub(_mz).normalize();
+  // Fire level, straight out from the palm. (Following the camera's sight line
+  // sent every unlocked shot into the dirt - the camera looks down at you.)
+  _aim.set(fx, 0, fz);
   // A locked bolt is aimed from the palm itself, not down the camera's sight
   // line - the two are a shoulder-width apart, which misses at range.
   const locked = findTarget();
@@ -584,13 +581,14 @@ function fireRepulsor() {
              t.obj.position.z - _mz.z).normalize();
   }
 
-  const m = new THREE.Mesh(boltGeo, mat(0xbdf3ff, { emissive: 0x2ad4ff }));
+  const m = new THREE.Mesh(boltGeo, mat(hero.blast.color, { emissive: hero.blast.glow }));
   m.position.copy(_mz);
   m.lookAt(_mz.x + _aim.x, _mz.y + _aim.y, _mz.z + _aim.z);
   scene.add(m);
   bolts.push({ obj: m, vel: _aim.clone().multiplyScalar(BOLT_SPEED), life: BOLT_LIFE,
-               target: locked ? locked.e : null });
-  burst(_mz, 0xbdf3ff, 3, 2.5);
+               target: locked ? locked.e : null, color: hero.blast.color,
+               damage: hero.blast.damage || 1 });
+  burst(_mz, hero.blast.color, 3, 2.5);
 }
 
 function updateBolts(dt) {
@@ -623,14 +621,14 @@ function updateBolts(dt) {
         const dy = e.obj.position.y + e.height * 0.55 - b.obj.position.y;
         if (Math.hypot(dx, dz) < e.radius + 0.7 && Math.abs(dy) < e.height * 0.7) {
           const d = Math.hypot(dx, dz) || 1;
-          hitEnemy(e, 'blast', dx / d, dz / d);
+          hitEnemy(e, 'blast', dx / d, dz / d, b.damage);
           done = true;
           break;
         }
       }
     }
     if (!done && pointSolid(b.obj.position)) {
-      burst(b.obj.position, 0xbdf3ff, 5, 3);
+      burst(b.obj.position, b.color, 5, 3);
       done = true;
     }
     if (done) { scene.remove(b.obj); bolts.splice(i, 1); }
@@ -662,8 +660,8 @@ function attack(kind) {
   }
 }
 
-function hitEnemy(e, kind, nx, nz) {
-  e.hp -= kind === 'kick' ? 2 : 1;
+function hitEnemy(e, kind, nx, nz, damage) {
+  e.hp -= damage || (kind === 'kick' ? 2 : 1);
   e.hitT = 0.2;
   const power = kind === 'kick' ? 11 : kind === 'blast' ? 5 : 7;
   e.vel.set(nx * power, 0, nz * power);
@@ -737,16 +735,13 @@ spawnEnemy('robot', -3.8, TOWER_TOP + 1.2, -3.8,
            { scale: 1.45, hpMul: 2, leash: 4.5, detect: 13, amp: 2.5, speedMul: 0.9 });
 
 // ============================================================
-//  PLAYER - a brick-built figure in red-and-gold armour
+//  PLAYER - a brick-built hero, swappable from the start screen
 // ============================================================
 const HX = 0.55, HY = 1.35, HZ = 0.55;   // collider half-extents
 const SPAWN = new THREE.Vector3(0, 2.2, 24);
-
-const SUIT = 0xd62828, SUIT_DARK = 0x9d1c22, PLATE = 0xf2b134, PLATE_LIT = 0xffd166;
-const ARC = 0xbdf3ff, ARC_GLOW = 0x1f9ad6, VISOR_GLOW = 0x2c7fa8;
 const TORSO_Y = 0.14;                    // rest height of the chest, bobbed while running
 
-const avatar = new THREE.Group();
+const SKIN = 0xf2c48d, STEEL = 0xc7ced8, SILVER = 0xe8edf3, LEATHER = 0x7a4a24;
 
 /** A single brick. */
 function brick(w, h, d, x, y, z, color, o = {}) {
@@ -755,86 +750,288 @@ function brick(w, h, d, x, y, z, color, o = {}) {
   m.position.set(x, y, z);
   if (o.rotZ) m.rotation.z = o.rotZ;
   if (o.rotX) m.rotation.x = o.rotX;
+  if (o.rotY) m.rotation.y = o.rotY;
   return m;
 }
-/** A round piece - minifig heads, studs, repulsors. */
+/** A round piece - minifig heads, studs, discs. */
 function round(r, h, seg, x, y, z, color, o = {}) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, o.rBot ?? r, h, seg), mat(color, o));
   m.position.set(x, y, z);
   if (o.rotX) m.rotation.x = o.rotX;
+  if (o.rotZ) m.rotation.z = o.rotZ;
   return m;
 }
 
-// ---- torso: chest, belt, gold plating and the chest light ----
-const torso = new THREE.Group();
-torso.position.y = TORSO_Y;
-torso.add(brick(1.00, 0.94, 0.58, 0, 0, 0, SUIT));                 // chest block
-torso.add(brick(1.06, 0.22, 0.64, 0, -0.42, 0, SUIT_DARK));        // hip flare of the torso
-torso.add(brick(0.56, 0.60, 0.08, 0, 0.10, 0.31, PLATE));          // gold breastplate
-torso.add(brick(0.90, 0.16, 0.10, 0, -0.14, 0.31, PLATE));         // ab band
-torso.add(brick(0.16, 0.70, 0.09, -0.42, 0.02, 0.30, PLATE_LIT));  // side stripes
-torso.add(brick(0.16, 0.70, 0.09, 0.42, 0.02, 0.30, PLATE_LIT));
-torso.add(round(0.24, 0.07, 12, 0, 0.20, 0.34, PLATE_LIT, { rotX: Math.PI / 2 }));   // reactor bezel
-torso.add(round(0.15, 0.09, 12, 0, 0.20, 0.37, ARC, { rotX: Math.PI / 2, emissive: ARC_GLOW }));
-torso.add(brick(0.30, 0.20, 0.30, -0.58, 0.34, 0, PLATE));         // shoulder pads
-torso.add(brick(0.30, 0.20, 0.30, 0.58, 0.34, 0, PLATE));
-torso.add(brick(0.44, 0.30, 0.14, 0, 0.12, -0.32, SUIT_DARK));     // back vent
-avatar.add(torso);
-
-// ---- head: helmet cylinder, gold faceplate, glowing slit eyes, top stud ----
-const head = new THREE.Group();
-head.position.y = 0.98;
-head.add(round(0.40, 0.62, 10, 0, 0, 0, SUIT));                    // helmet
-head.add(brick(0.54, 0.46, 0.20, 0, -0.02, 0.30, PLATE));          // faceplate
-head.add(brick(0.50, 0.10, 0.10, 0, 0.22, 0.34, PLATE_LIT));       // brow ridge
-head.add(brick(0.13, 0.08, 0.06, -0.14, 0.06, 0.40, ARC, { emissive: VISOR_GLOW }));   // eye slits
-head.add(brick(0.13, 0.08, 0.06, 0.14, 0.06, 0.40, ARC, { emissive: VISOR_GLOW }));
-head.add(brick(0.30, 0.16, 0.12, 0, -0.20, 0.34, SUIT_DARK));      // mouth grille
-head.add(round(0.17, 0.13, 10, 0, 0.37, 0, SUIT));                 // minifig stud on top
-avatar.add(head);
-
-// ---- limbs on pivots so they swing from the shoulder / hip ----
-function pivot(obj, x, y) {
+// ------------------------------------------------------------
+//  Every hero is the same minifig skeleton in different colours:
+//  a torso, a head, two arm pivots and two leg pivots. Only the
+//  trimmings and hand props change, so one animation rig drives all.
+// ------------------------------------------------------------
+function makeFigure(s) {
+  const parts = { thrusters: [], cape: null, props: [] };
   const g = new THREE.Group();
-  g.position.set(x, y, 0);
-  g.add(obj);
-  avatar.add(g);
-  return g;
-}
-function buildArm(side) {
-  const g = new THREE.Group();
-  g.add(brick(0.30, 0.60, 0.34, 0, -0.30, 0, SUIT));               // upper arm
-  g.add(brick(0.34, 0.16, 0.38, 0, -0.66, 0, PLATE));              // gauntlet cuff
-  g.add(brick(0.28, 0.24, 0.28, 0, -0.84, 0, SUIT_DARK));          // claw hand
-  g.add(round(0.10, 0.05, 10, 0, -0.97, 0, ARC, { emissive: ARC_GLOW }));  // palm repulsor
-  return g;
-}
-function buildLeg() {
-  const g = new THREE.Group();
-  g.add(brick(0.38, 0.42, 0.42, 0, -0.20, 0, SUIT));               // thigh
-  g.add(brick(0.42, 0.10, 0.46, 0, -0.42, 0.02, PLATE_LIT));       // knee band
-  g.add(brick(0.44, 0.52, 0.56, 0, -0.60, 0.05, PLATE));           // tall gold boot
-  g.add(brick(0.46, 0.10, 0.60, 0, -0.82, 0.07, SUIT_DARK));       // sole
-  return g;
-}
-const pArmL = pivot(buildArm(-1), -0.64, 0.50), pArmR = pivot(buildArm(1), 0.64, 0.50);
-const pLegL = pivot(buildLeg(), -0.26, -0.50), pLegR = pivot(buildLeg(), 0.26, -0.50);
 
-// hip brick joining the legs
-avatar.add(brick(0.74, 0.24, 0.46, 0, -0.44, 0, SUIT_DARK));
+  const torso = new THREE.Group();
+  torso.position.y = TORSO_Y;
+  torso.add(brick(1.00, 0.94, 0.58, 0, 0, 0, s.chest));
+  torso.add(brick(1.06, 0.22, 0.64, 0, -0.42, 0, s.belt));
+  if (s.shoulders) {
+    torso.add(brick(0.30, 0.20, 0.30, -0.58, 0.34, 0, s.shoulders));
+    torso.add(brick(0.30, 0.20, 0.30, 0.58, 0.34, 0, s.shoulders));
+  }
+  if (s.chestArt) s.chestArt(torso);
+  g.add(torso);
 
-// ---- boot thrusters: parented to the legs so the flames track the boots ----
-const thrusters = [pLegL, pLegR].map(leg => {
-  const t = round(0.15, 0.5, 8, 0, -1.12, 0.05, ARC, { rBot: 0.02, emissive: ARC_GLOW, shadow: false });
-  t.visible = false;
-  leg.add(t);
-  return t;
-});
+  const head = new THREE.Group();
+  head.position.y = 0.98;
+  head.add(round(0.40, 0.62, 10, 0, 0, 0, s.headColor));
+  if (s.headArt) s.headArt(head);
+  g.add(head);
 
-avatar.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
-for (const t of thrusters) t.castShadow = false;      // flames should not cast shadows
-avatar.position.copy(SPAWN);
-scene.add(avatar);
+  const pivot = (obj, x, y) => {
+    const p = new THREE.Group();
+    p.position.set(x, y, 0);
+    p.add(obj);
+    g.add(p);
+    return p;
+  };
+  const arm = side => {
+    const a = new THREE.Group();
+    a.add(brick(0.30, 0.60, 0.34, 0, -0.30, 0, s.armUpper));
+    a.add(brick(0.34, 0.16, 0.38, 0, -0.66, 0, s.cuff));
+    a.add(brick(0.28, 0.24, 0.28, 0, -0.84, 0, s.glove));
+    if (s.palm) a.add(round(0.10, 0.05, 10, 0, -0.97, 0, s.palm.color, { emissive: s.palm.glow }));
+    if (s.handProp) s.handProp(a, side, parts);
+    return a;
+  };
+  const leg = () => {
+    const l = new THREE.Group();
+    l.add(brick(0.38, 0.42, 0.42, 0, -0.20, 0, s.thigh));
+    if (s.knee) l.add(brick(0.42, 0.10, 0.46, 0, -0.42, 0.02, s.knee));
+    l.add(brick(0.44, 0.52, 0.56, 0, -0.60, 0.05, s.boot));
+    l.add(brick(0.46, 0.10, 0.60, 0, -0.82, 0.07, s.sole || s.boot));
+    return l;
+  };
+
+  parts.torso = torso;
+  parts.head = head;
+  parts.pArmL = pivot(arm(-1), -0.64, 0.50);
+  parts.pArmR = pivot(arm(1), 0.64, 0.50);
+  parts.pLegL = pivot(leg(), -0.26, -0.50);
+  parts.pLegR = pivot(leg(), 0.26, -0.50);
+
+  g.add(brick(0.74, 0.24, 0.46, 0, -0.44, 0, s.belt));      // hips
+
+  if (s.cape) {
+    const c = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.5), mat(s.cape, { side: THREE.DoubleSide }));
+    c.position.set(0, 0.05, -0.34);
+    g.add(c);
+    parts.cape = c;
+  }
+  if (s.jets) {
+    parts.thrusters = [parts.pLegL, parts.pLegR].map(legPivot => {
+      const t = round(0.15, 0.5, 8, 0, -1.12, 0.05, s.jets.color,
+                      { rBot: 0.02, emissive: s.jets.glow });
+      t.visible = false;
+      legPivot.add(t);
+      return t;
+    });
+  }
+
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+  for (const t of parts.thrusters) t.castShadow = false;
+  parts.group = g;
+  return parts;
+}
+
+// ---------- the roster ----------
+const HEROES = [
+  {
+    id: 'ironman', name: 'Iron Man', swatch: ['#d62828', '#f2b134', '#bdf3ff'],
+    blast: { color: 0xbdf3ff, glow: 0x2ad4ff, damage: 1 },
+    spec: {
+      chest: 0xd62828, belt: 0x9d1c22, shoulders: 0xf2b134, headColor: 0xd62828,
+      armUpper: 0xd62828, cuff: 0xf2b134, glove: 0x9d1c22,
+      thigh: 0xd62828, knee: 0xffd166, boot: 0xf2b134, sole: 0x9d1c22,
+      palm: { color: 0xbdf3ff, glow: 0x1f9ad6 },
+      jets: { color: 0xbdf3ff, glow: 0x1f9ad6 },
+      chestArt(t) {
+        t.add(brick(0.56, 0.60, 0.08, 0, 0.10, 0.31, 0xf2b134));
+        t.add(brick(0.90, 0.16, 0.10, 0, -0.14, 0.31, 0xf2b134));
+        t.add(brick(0.16, 0.70, 0.09, -0.42, 0.02, 0.30, 0xffd166));
+        t.add(brick(0.16, 0.70, 0.09, 0.42, 0.02, 0.30, 0xffd166));
+        t.add(round(0.24, 0.07, 12, 0, 0.20, 0.34, 0xffd166, { rotX: Math.PI / 2 }));
+        t.add(round(0.15, 0.09, 12, 0, 0.20, 0.37, 0xbdf3ff, { rotX: Math.PI / 2, emissive: 0x1f9ad6 }));
+        t.add(brick(0.44, 0.30, 0.14, 0, 0.12, -0.32, 0x9d1c22));
+      },
+      headArt(h) {
+        h.add(brick(0.54, 0.46, 0.20, 0, -0.02, 0.30, 0xf2b134));
+        h.add(brick(0.50, 0.10, 0.10, 0, 0.22, 0.34, 0xffd166));
+        h.add(brick(0.13, 0.08, 0.06, -0.14, 0.06, 0.40, 0xbdf3ff, { emissive: 0x2c7fa8 }));
+        h.add(brick(0.13, 0.08, 0.06, 0.14, 0.06, 0.40, 0xbdf3ff, { emissive: 0x2c7fa8 }));
+        h.add(brick(0.30, 0.16, 0.12, 0, -0.20, 0.34, 0x9d1c22));
+        h.add(round(0.17, 0.13, 10, 0, 0.37, 0, 0xd62828));
+      },
+    },
+  },
+  {
+    id: 'spiderman', name: 'Spider-Man', swatch: ['#e63946', '#2b5fd9', '#1b1240'],
+    blast: { color: 0xffffff, glow: 0x9fb3c8, damage: 1 },
+    spec: {
+      chest: 0xe63946, belt: 0x2b5fd9, headColor: 0xe63946,
+      armUpper: 0x2b5fd9, cuff: 0x2b5fd9, glove: 0xe63946,
+      thigh: 0x2b5fd9, knee: 0x2b5fd9, boot: 0xe63946, sole: 0xb4232f,
+      chestArt(t) {
+        // black spider on the chest plus a few web lines
+        t.add(brick(0.22, 0.26, 0.06, 0, 0.18, 0.31, 0x1b1240));
+        t.add(brick(0.46, 0.06, 0.05, 0, 0.30, 0.31, 0x1b1240));
+        t.add(brick(0.46, 0.06, 0.05, 0, 0.06, 0.31, 0x1b1240));
+        t.add(brick(0.05, 0.74, 0.05, -0.24, 0.06, 0.31, 0x1b1240));
+        t.add(brick(0.05, 0.74, 0.05, 0.24, 0.06, 0.31, 0x1b1240));
+        t.add(brick(0.86, 0.05, 0.05, 0, -0.24, 0.31, 0x1b1240));
+      },
+      headArt(h) {
+        // big white lenses with dark rims
+        h.add(brick(0.26, 0.19, 0.06, -0.15, 0.05, 0.39, 0x1b1240));
+        h.add(brick(0.26, 0.19, 0.06, 0.15, 0.05, 0.39, 0x1b1240));
+        h.add(brick(0.21, 0.14, 0.05, -0.15, 0.05, 0.42, 0xffffff));
+        h.add(brick(0.21, 0.14, 0.05, 0.15, 0.05, 0.42, 0xffffff));
+        h.add(brick(0.05, 0.50, 0.05, 0, 0.02, 0.40, 0x1b1240));      // web seam
+        h.add(brick(0.60, 0.05, 0.05, 0, 0.24, 0.38, 0x1b1240));
+        h.add(round(0.17, 0.13, 10, 0, 0.37, 0, 0xe63946));
+      },
+    },
+  },
+  {
+    id: 'captain', name: 'Captain America', swatch: ['#2b5fd9', '#ffffff', '#e63946'],
+    blast: { color: 0xdce9ff, glow: 0x3a6fd8, damage: 1 },
+    spec: {
+      chest: 0x2b5fd9, belt: 0x8d5524, shoulders: 0x2b5fd9, headColor: 0x2b5fd9,
+      armUpper: 0x2b5fd9, cuff: 0x2b5fd9, glove: 0xe63946,
+      thigh: 0x2b5fd9, knee: 0x2b5fd9, boot: 0xe63946, sole: 0xb4232f,
+      chestArt(t) {
+        t.add(round(0.20, 0.06, 5, 0, 0.22, 0.32, 0xffffff, { rotX: Math.PI / 2 }));   // star
+        for (let i = 0; i < 3; i++) {                                                  // belly stripes
+          t.add(brick(0.92, 0.10, 0.06, 0, -0.06 - i * 0.14, 0.31, i % 2 ? 0xffffff : 0xe63946));
+        }
+      },
+      headArt(h) {
+        h.add(brick(0.46, 0.30, 0.14, 0, -0.12, 0.32, SKIN));           // face opening
+        h.add(brick(0.11, 0.07, 0.06, -0.12, -0.04, 0.39, 0x1b1240));   // eyes
+        h.add(brick(0.11, 0.07, 0.06, 0.12, -0.04, 0.39, 0x1b1240));
+        h.add(brick(0.16, 0.20, 0.08, -0.36, 0.14, 0.20, 0xffffff));    // cowl wings
+        h.add(brick(0.16, 0.20, 0.08, 0.36, 0.14, 0.20, 0xffffff));
+        h.add(brick(0.14, 0.18, 0.05, 0, 0.20, 0.38, 0xffffff));        // the A
+        h.add(round(0.17, 0.13, 10, 0, 0.37, 0, 0x2b5fd9));
+      },
+      handProp(a, side, parts) {
+        if (side !== -1) return;                                        // shield on the left arm
+        const shield = new THREE.Group();
+        shield.position.set(-0.22, -0.80, 0.04);
+        shield.rotation.z = 0.25;
+        shield.add(round(0.46, 0.09, 16, 0, 0, 0, 0xe63946, { rotX: Math.PI / 2 }));
+        shield.add(round(0.34, 0.11, 16, 0, 0, 0.02, 0xffffff, { rotX: Math.PI / 2 }));
+        shield.add(round(0.23, 0.12, 16, 0, 0, 0.03, 0xe63946, { rotX: Math.PI / 2 }));
+        shield.add(round(0.15, 0.13, 16, 0, 0, 0.04, 0x2b5fd9, { rotX: Math.PI / 2 }));
+        shield.add(round(0.09, 0.14, 5, 0, 0, 0.05, 0xffffff, { rotX: Math.PI / 2 }));
+        a.add(shield);
+        parts.props.push(shield);
+      },
+    },
+  },
+  {
+    id: 'wondergirl', name: 'Wonder Girl', swatch: ['#e63946', '#ffd166', '#2b5fd9'],
+    blast: { color: 0xffd166, glow: 0xc8871a, damage: 1 },
+    spec: {
+      chest: 0xe63946, belt: 0xffd166, headColor: SKIN,
+      armUpper: SKIN, cuff: SILVER, glove: SKIN,
+      thigh: 0x2b5fd9, knee: 0x2b5fd9, boot: 0xe63946, sole: 0xb4232f,
+      chestArt(t) {
+        t.add(brick(0.26, 0.16, 0.07, 0, 0.16, 0.31, 0xffd166));        // eagle body
+        t.add(brick(0.62, 0.09, 0.06, 0, 0.24, 0.31, 0xffd166));        // wings
+        t.add(brick(0.40, 0.08, 0.06, 0, 0.06, 0.31, 0xffd166));
+        t.add(brick(1.02, 0.10, 0.62, 0, -0.30, 0, 0xffd166));          // gold belt line
+        for (const x of [-0.32, 0, 0.32]) t.add(brick(0.10, 0.10, 0.06, x, -0.46, 0.33, 0xffffff));  // stars
+      },
+      headArt(h) {
+        h.add(round(0.43, 0.30, 10, 0, 0.18, 0, 0x2b1b1a));             // hair cap
+        h.add(brick(0.62, 0.62, 0.30, 0, -0.02, -0.28, 0x2b1b1a));      // hair down the back
+        h.add(round(0.42, 0.10, 10, 0, 0.10, 0, 0xffd166));             // tiara band
+        h.add(brick(0.13, 0.13, 0.06, 0, 0.10, 0.40, 0xe63946));        // tiara star
+        h.add(brick(0.11, 0.08, 0.06, -0.13, -0.04, 0.39, 0x1b1240));   // eyes
+        h.add(brick(0.11, 0.08, 0.06, 0.13, -0.04, 0.39, 0x1b1240));
+        h.add(brick(0.20, 0.06, 0.05, 0, -0.20, 0.39, 0xb4232f));       // smile
+      },
+      handProp(a, side, parts) {
+        if (side !== 1) return;                                          // lasso coil on the right
+        const lasso = round(0.17, 0.07, 12, 0, -0.98, 0.02, 0xffd166, { rotX: Math.PI / 2, emissive: 0x6b4400 });
+        a.add(lasso);
+        parts.props.push(lasso);
+      },
+    },
+  },
+  {
+    id: 'thor', name: 'Thor', swatch: ['#c7ced8', '#e63946', '#3b4a63'],
+    blast: { color: 0xdff3ff, glow: 0x4aa8ff, damage: 2 },
+    spec: {
+      chest: 0x3b4a63, belt: LEATHER, shoulders: STEEL, headColor: SKIN, cape: 0xe63946,
+      armUpper: 0x3b4a63, cuff: STEEL, glove: 0x2c3547,
+      thigh: 0x2c3547, knee: STEEL, boot: LEATHER, sole: 0x53331a,
+      chestArt(t) {
+        for (const x of [-0.30, 0, 0.30]) {                              // the famous discs
+          t.add(round(0.13, 0.07, 10, x, 0.18, 0.32, STEEL, { rotX: Math.PI / 2 }));
+          t.add(round(0.13, 0.07, 10, x, -0.10, 0.32, STEEL, { rotX: Math.PI / 2 }));
+        }
+        t.add(brick(1.04, 0.12, 0.62, 0, 0.40, 0, STEEL));               // collar
+      },
+      headArt(h) {
+        h.add(round(0.42, 0.28, 10, 0, 0.19, 0, STEEL));                 // helmet cap
+        h.add(brick(0.16, 0.34, 0.10, -0.36, 0.34, 0.02, SILVER, { rotZ: -0.35 }));   // wings
+        h.add(brick(0.16, 0.34, 0.10, 0.36, 0.34, 0.02, SILVER, { rotZ: 0.35 }));
+        h.add(brick(0.60, 0.34, 0.30, 0, -0.16, -0.26, 0xf1d27a));       // blond hair
+        h.add(brick(0.11, 0.08, 0.06, -0.13, -0.02, 0.39, 0x1b1240));    // eyes
+        h.add(brick(0.11, 0.08, 0.06, 0.13, -0.02, 0.39, 0x1b1240));
+        h.add(brick(0.30, 0.14, 0.10, 0, -0.24, 0.34, 0xd9b26a));        // beard
+      },
+      handProp(a, side, parts) {
+        if (side !== 1) return;                                          // Mjolnir in the right hand
+        const hammer = new THREE.Group();
+        hammer.position.set(0, -0.92, 0.06);
+        hammer.add(brick(0.13, 0.52, 0.13, 0, -0.22, 0, LEATHER));       // handle
+        hammer.add(brick(0.40, 0.34, 0.36, 0, 0.12, 0, STEEL));          // head
+        hammer.add(brick(0.44, 0.09, 0.40, 0, 0.12, 0, SILVER));
+        a.add(hammer);
+        parts.props.push(hammer);
+      },
+    },
+  },
+];
+
+// ---------- live rig, rebuilt whenever the hero changes ----------
+let hero = HEROES[0];
+let rig = null;
+let avatar, torso, head, pArmL, pArmR, pLegL, pLegR, thrusters = [], cape = null;
+
+function selectHero(idx) {
+  const next = HEROES[(idx + HEROES.length) % HEROES.length];
+  const keep = avatar ? avatar.position.clone() : SPAWN.clone();
+  const keepRot = avatar ? avatar.rotation.y : Math.PI;
+  if (avatar) scene.remove(avatar);
+
+  hero = next;
+  rig = makeFigure(next.spec);
+  avatar = rig.group;
+  torso = rig.torso; head = rig.head;
+  pArmL = rig.pArmL; pArmR = rig.pArmR;
+  pLegL = rig.pLegL; pLegR = rig.pLegR;
+  thrusters = rig.thrusters;
+  cape = rig.cape;
+  avatar.position.copy(keep);
+  avatar.rotation.y = keepRot;
+  scene.add(avatar);
+  return hero;
+}
+selectHero(0);
 
 const player = {
   pos: SPAWN.clone(),
@@ -872,6 +1069,10 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyJ') attack('punch');
   if (e.code === 'KeyK') attack('kick');
   if (e.code === 'KeyL') fireRepulsor();
+  if (e.code === 'KeyC') {
+    pickHero(HEROES.indexOf(hero) + 1);
+    toast('Suited up: ' + hero.name);
+  }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -1115,8 +1316,34 @@ document.getElementById('startBtn').addEventListener('click', () => {
   grabPointer();
   toast('Follow the stairs up the tower');
 });
-document.getElementById('againBtn').addEventListener('click', () => {
+// ---------- hero picker ----------
+const heroButtons = Array.from(document.querySelectorAll('#heroPick .hero'));
+function paintHeroPick() {
+  for (const b of heroButtons) b.classList.toggle('on', b.dataset.hero === hero.id);
+  document.getElementById('heroName').textContent = hero.name;
+}
+function pickHero(idx) {
+  selectHero(idx);
+  paintHeroPick();
+  try { localStorage.setItem('castle-climber-hero', hero.id); } catch (err) {}
+}
+heroButtons.forEach((b, i) => {
+  b.addEventListener('click', () => { pickHero(i); if (started) toast('Suited up: ' + hero.name); });
+});
+try {
+  const saved = localStorage.getItem('castle-climber-hero');
+  const at = HEROES.findIndex(h => h.id === saved);
+  if (at >= 0) selectHero(at);
+} catch (err) {}
+paintHeroPick();
+
+document.getElementById('heroBtn').addEventListener('click', () => {
   document.getElementById('winCard').classList.remove('show');
+  document.getElementById('overlay').classList.remove('hidden');
+  resetRun();
+});
+
+function resetRun() {
   won = false; time = 0; collected = 0; falls = 0; defeated = 0;
   hud.ko.textContent = '0';
   player.hp = 3; player.invuln = 0; updateHearts();
@@ -1125,6 +1352,10 @@ document.getElementById('againBtn').addEventListener('click', () => {
   hud.gems.textContent = '0';
   player.safe.copy(SPAWN);
   respawn(true);
+}
+document.getElementById('againBtn').addEventListener('click', () => {
+  document.getElementById('winCard').classList.remove('show');
+  resetRun();
 });
 
 // ============================================================
@@ -1450,7 +1681,7 @@ function step(dt) {
     pArmL.rotation.x = -sw * 0.9; pArmR.rotation.x = sw * 0.9;
     pArmL.rotation.z = 0.08; pArmR.rotation.z = -0.08;
     torso.position.y = TORSO_Y + Math.abs(Math.sin(p.animT * 2.4)) * 0.05 * Math.min(1, hspeed / 9);
-    thrusters[0].visible = thrusters[1].visible = false;
+    for (const t of thrusters) t.visible = false;
   } else {
     // repulsor pose: arms swept out and back so the palms point at the ground
     const rising = p.vel.y > 0;
@@ -1492,6 +1723,10 @@ function step(dt) {
     torso.rotation.y = 0;
   }
 
+  if (cape) {
+    cape.rotation.x = -0.22 - clamp(hspeed / 26, 0, 0.5) + Math.sin(clock.elapsedTime * 6) * 0.06;
+  }
+
   // blink while the armour is still recovering from a hit
   avatar.visible = p.invuln <= 0 || Math.sin(clock.elapsedTime * 34) > -0.3;
 }
@@ -1525,6 +1760,7 @@ if (location.hash.indexOf('dev') >= 0) {
     start() { document.getElementById('startBtn').click(); },
     pause(v) { devPause = v !== false; },
     enemies, attack, bolts, shoot: fireRepulsor,
+    heroes: HEROES, pickHero, currentHero: () => hero.id,
     clearEnemies() { for (const e of enemies) { e.dead = true; e.respawnT = 1e9; e.obj.visible = false; } },
     // live positions, so tests follow the moving platforms rather than their base points
     waypoints() {

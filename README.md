@@ -1,9 +1,15 @@
 # Castle Climber
 
-A small 3D run-and-jump platformer that runs in any browser. Play a brick-built
-figure in red-and-gold armour: climb the spiral staircase around a candy-colored
-castle tower, hop the floating blocks, fight past the monsters and robots that
-guard the way, and claim the golden crown on the roof.
+A small 3D run-and-jump platformer that runs in any browser. Pick a brick-built
+hero, then climb the spiral staircase around a candy-colored castle tower, hop
+the floating blocks, fight past the monsters and robots that guard the way, and
+claim the golden crown on the roof.
+
+**Heroes.** Iron Man (boot jets, cyan repulsor), Spider-Man (web shot),
+Captain America (shield on the arm), Wonder Girl (golden lasso) and Thor
+(Mjolnir, and lightning that hits twice as hard). Choose one on the start
+screen or press `C` to swap mid-run - they all move and jump identically, so
+the climb plays the same whoever you pick.
 
 **Play it:** https://tubagusdss.github.io/castle-climber/
 
@@ -19,6 +25,7 @@ guard the way, and claim the golden crown on the roof.
 | Punch | `J` | PUNCH button |
 | Kick | `K` or right click | KICK button |
 | Zoom | scroll wheel | — |
+| Swap hero | `C` | pick on the start screen |
 | Restart | `R` | — |
 
 Miss a jump and you reappear on the last block you stood on, so a fall costs

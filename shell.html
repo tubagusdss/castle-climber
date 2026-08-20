@@ -221,6 +221,51 @@
   }
   .keys .hint { background: rgba(255, 243, 220, 0.07); }
 
+  /* ---------- hero picker ---------- */
+  .pick-label {
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(255, 243, 220, 0.6); font-weight: 600; margin-bottom: 10px;
+  }
+  #heroPick {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    margin-bottom: 6px;
+  }
+  .hero {
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    padding: 10px 4px 9px;
+    background: rgba(255, 243, 220, 0.06);
+    border: 2px solid var(--edge);
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: var(--body); font-size: 10px; font-weight: 600;
+    color: rgba(255, 243, 220, 0.72);
+    line-height: 1.15; text-align: center;
+    box-shadow: none;
+    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .hero:hover { background: rgba(255, 243, 220, 0.12); transform: translateY(-2px); }
+  .hero:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+  .hero.on {
+    border-color: var(--gold);
+    background: rgba(255, 209, 102, 0.16);
+    color: var(--cream);
+  }
+  /* three stacked bands read as the hero's colours */
+  .hero .chip {
+    width: 30px; height: 34px; border-radius: 7px; overflow: hidden;
+    display: flex; flex-direction: column;
+    border: 2px solid rgba(27, 18, 64, 0.55);
+  }
+  .hero .chip i { flex: 1; }
+  .hero.on .chip { transform: scale(1.06); }
+  #heroName {
+    font-family: var(--display); font-size: 13px; color: var(--gold);
+    margin-bottom: 20px; display: block;
+  }
+  @media (max-width: 460px) {
+    #heroPick { grid-template-columns: repeat(3, 1fr); }
+  }
+
   button {
     font-family: var(--display); font-size: 17px;
     color: var(--ink); background: var(--gold);
@@ -232,6 +277,15 @@
   button:hover { background: #ffdd8a; }
   button:active { transform: translateY(4px); box-shadow: 0 2px 0 #c79a34; }
   button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+
+  button.ghost {
+    background: transparent; color: rgba(255, 243, 220, 0.8);
+    border: 2px solid var(--edge); box-shadow: none;
+    font-size: 13px; padding: 12px 20px;
+  }
+  button.ghost:hover { background: rgba(255, 243, 220, 0.1); color: var(--cream); }
+  button.ghost:active { transform: translateY(2px); box-shadow: none; }
+  .card-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
   #winCard { display: none; }
   #winCard.show { display: grid; }
@@ -356,6 +410,7 @@
     <span class="hint"><kbd>K</kbd> / <kbd>Right-click</kbd> Kick</span>
     <span class="hint"><kbd>Shift</kbd> Sprint</span>
     <span class="hint"><kbd>Mouse</kbd> Look</span>
+    <span class="hint"><kbd>C</kbd> Swap hero</span>
     <span class="hint"><kbd>R</kbd> Restart</span>
   </div>
 
@@ -383,6 +438,15 @@
       <span class="hint"><kbd>J</kbd> Punch</span>
       <span class="hint"><kbd>K</kbd> Kick</span>
     </div>
+    <div class="pick-label">Choose your hero</div>
+    <div id="heroPick">
+      <button class="hero" data-hero="ironman"><span class="chip" aria-hidden="true"><i style="background:#d62828"></i><i style="background:#f2b134"></i><i style="background:#bdf3ff"></i></span>Iron Man</button>
+      <button class="hero" data-hero="spiderman"><span class="chip" aria-hidden="true"><i style="background:#e63946"></i><i style="background:#2b5fd9"></i><i style="background:#1b1240"></i></span>Spider-Man</button>
+      <button class="hero" data-hero="captain"><span class="chip" aria-hidden="true"><i style="background:#2b5fd9"></i><i style="background:#ffffff"></i><i style="background:#e63946"></i></span>Captain America</button>
+      <button class="hero" data-hero="wondergirl"><span class="chip" aria-hidden="true"><i style="background:#e63946"></i><i style="background:#ffd166"></i><i style="background:#2b5fd9"></i></span>Wonder Girl</button>
+      <button class="hero" data-hero="thor"><span class="chip" aria-hidden="true"><i style="background:#c7ced8"></i><i style="background:#e63946"></i><i style="background:#3b4a63"></i></span>Thor</button>
+    </div>
+    <span id="heroName">Iron Man</span>
     <button id="startBtn">Start climbing</button>
   </div>
 </div>
@@ -396,7 +460,10 @@
       <div><b id="winGems">0</b><span>Gems</span></div>
       <div><b id="winFalls">0</b><span>Falls</span></div>
     </div>
-    <button id="againBtn">Climb again</button>
+    <div class="card-actions">
+      <button id="againBtn">Climb again</button>
+      <button id="heroBtn" class="ghost">Pick another hero</button>
+    </div>
   </div>
 </div>
 
