@@ -1374,6 +1374,7 @@ const player = {
   cut: false,
   hp: 3,
   invuln: 0,
+  stepSmooth: 0,      // visual catch-up after a step-up, so stairs do not judder
   attackT: 0,
   attackDur: 0.24,
   attackType: 'punch',
@@ -1781,7 +1782,7 @@ function tick() {
   // Height is followed lazily - stairs raise the player in 0.5 steps and a rigid
   // camera turns that staircase into a shudder.
   const rx = Math.cos(yaw), rz = -Math.sin(yaw);          // camera right vector
-  const wantY = player.pos.y + 1.3;
+  const wantY = player.pos.y - player.stepSmooth + 1.3;
   if (Math.abs(wantY - camY) > 4.5 || camY === null) camY = wantY;   // teleports, big falls
   else camY += (wantY - camY) * (1 - Math.pow(player.grounded ? 0.0008 : 0.00002, dt));
   camTarget.set(
@@ -1924,6 +1925,7 @@ function step(dt) {
   p.buffer = Math.max(0, p.buffer - dt);
   p.coyote = Math.max(0, p.coyote - dt);
   p.invuln = Math.max(0, p.invuln - dt);
+  p.stepSmooth = Math.max(0, p.stepSmooth - dt * 8.5);
   p.attackT = Math.max(0, p.attackT - dt);
   p.cool = Math.max(0, p.cool - dt);
   p.shootT = Math.max(0, p.shootT - dt);
@@ -1960,18 +1962,26 @@ function step(dt) {
     const r = resolveAll(p.pos, p.vel);
     if (r.grounded) { grounded = true; ground = r.ground; }
 
-    // Step-up: walked into a stair riser while on the ground? Lift over it.
+    // Step-up: walked into a stair riser while on the ground? Rise over it - but
+    // only by as much as the step actually needs. Lifting a fixed amount and
+    // dropping back is what made stairs shake.
     if (r.wall && (wasGrounded || grounded) && preVel.y <= 1) {
       const cand = _cand.copy(before).addScaledVector(preVel, sdt);
-      cand.y += STEP_UP;
-      // it's a step only if the lifted spot is clear AND something solid sits under it
-      const probe = _probe.copy(cand);
-      probe.y -= STEP_UP * 0.98;
-      if (!overlapsAny(cand) && overlapsAny(probe)) {
-        p.pos.copy(cand);
-        p.vel.x = preVel.x; p.vel.z = preVel.z;  // keep the momentum we came in with
-        const r2 = resolveAll(p.pos, p.vel);
-        if (r2.grounded) { grounded = true; ground = r2.ground; }
+      let lift = 0;
+      for (let h = 0.06; h <= STEP_UP + 0.001; h += 0.06) {
+        cand.y = before.y + h;
+        if (!overlapsAny(cand)) { lift = h; break; }
+      }
+      if (lift > 0) {
+        const probe = _probe.copy(cand);
+        probe.y -= lift + 0.12;                  // a step has ground under it; a wall does not
+        if (overlapsAny(probe)) {
+          p.pos.copy(cand);
+          p.vel.x = preVel.x; p.vel.z = preVel.z;
+          p.stepSmooth = Math.min(1.2, p.stepSmooth + lift);   // let the eye catch up
+          const r2 = resolveAll(p.pos, p.vel);
+          if (r2.grounded) { grounded = true; ground = r2.ground; }
+        }
       }
     }
   }
@@ -2015,7 +2025,7 @@ function step(dt) {
 
   // --- avatar transform & animation ---
   avatar.position.copy(p.pos);
-  avatar.position.y -= 0.05;
+  avatar.position.y -= 0.05 + p.stepSmooth;
 
   const hspeed = Math.hypot(p.vel.x, p.vel.z);
   if (hspeed > 0.6) {
