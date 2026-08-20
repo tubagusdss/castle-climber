@@ -146,22 +146,7 @@
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
 
-  /* ---------- aim reticle ---------- */
-  #crosshair {
-    position: absolute; left: 50%; top: 50%;
-    width: 38px; height: 38px; margin: -19px 0 0 -19px;
-    opacity: 0; transition: opacity 0.3s ease, transform 0.12s ease;
-  }
-  body.playing #crosshair { opacity: 0.85; }
-  #crosshair svg { display: block; width: 100%; height: 100%; }
-  #crosshair .ring { fill: none; stroke: var(--cream); stroke-width: 1.6; opacity: 0.75; }
-  #crosshair .tick { stroke: var(--cream); stroke-width: 2.2; stroke-linecap: round; }
-  #crosshair .dot  { fill: var(--sky); }
-  #crosshair.locked { transform: scale(1.18); }
-  #crosshair.locked .ring, #crosshair.locked .tick { stroke: var(--red); opacity: 1; }
-  #crosshair.locked .dot { fill: var(--red); }
-
-  /* corner brackets that sit on the locked enemy */
+  /* ---------- aim lock ---------- */
   #lockon {
     position: absolute; left: 0; top: 0;
     width: 60px; height: 60px; transform: translate(-50%, -50%);
@@ -374,13 +359,6 @@
     <span class="hint"><kbd>R</kbd> Restart</span>
   </div>
 
-  <div id="crosshair">
-    <svg viewBox="0 0 38 38" aria-hidden="true">
-      <circle class="ring" cx="19" cy="19" r="12"/>
-      <path class="tick" d="M19 1.5v6M19 30.5v6M1.5 19h6M30.5 19h6"/>
-      <circle class="dot" cx="19" cy="19" r="2.2"/>
-    </svg>
-  </div>
   <div id="lockon"><i></i><i></i><i></i><i></i></div>
 
   <div id="toast"></div>
@@ -1006,7 +984,7 @@ function fireRepulsor() {
   _mz.set(p.pos.x + fx * 0.7, p.pos.y + 0.25, p.pos.z + fz * 0.7);   // palm muzzle
 
   // Send the bolt through the point the reticle covers, so what you see under
-  // the crosshair is what you hit. A locked target overrides with a homing line.
+  // the lock marker sits on is what you hit, and a lock overrides with a homing line.
   _aim.copy(camTarget).sub(camera.position).normalize();
   _aim.multiplyScalar(38).add(camera.position).sub(_mz).normalize();
   // A locked bolt is aimed from the palm itself, not down the camera's sight
@@ -1521,7 +1499,6 @@ const hud = {
   pip: document.getElementById('gaugePip'),
   toast: document.getElementById('toast'),
   ko: document.getElementById('koCount'),
-  cross: document.getElementById('crosshair'),
   lock: document.getElementById('lockon'),
   hearts: Array.from(document.querySelectorAll('#hearts .heart')),
 };
@@ -1704,20 +1681,17 @@ const _tv = new THREE.Vector3();
 function updateReticle() {
   if (!started || won) {
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   const t = findTarget();
   if (!t) {
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   _tv.set(t.e.obj.position.x, t.e.obj.position.y + t.e.height * 0.55, t.e.obj.position.z);
   _tv.project(camera);
   if (_tv.z > 1) {                       // behind the camera
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   const size = clamp(760 / Math.max(4, t.d), 30, 110);
@@ -1726,7 +1700,6 @@ function updateReticle() {
   hud.lock.style.left = ((_tv.x * 0.5 + 0.5) * innerWidth) + 'px';
   hud.lock.style.top = ((-_tv.y * 0.5 + 0.5) * innerHeight) + 'px';
   hud.lock.classList.add('on');
-  hud.cross.classList.add('locked');
 }
 
 function formatTime(s) {

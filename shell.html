@@ -146,22 +146,7 @@
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
 
-  /* ---------- aim reticle ---------- */
-  #crosshair {
-    position: absolute; left: 50%; top: 50%;
-    width: 38px; height: 38px; margin: -19px 0 0 -19px;
-    opacity: 0; transition: opacity 0.3s ease, transform 0.12s ease;
-  }
-  body.playing #crosshair { opacity: 0.85; }
-  #crosshair svg { display: block; width: 100%; height: 100%; }
-  #crosshair .ring { fill: none; stroke: var(--cream); stroke-width: 1.6; opacity: 0.75; }
-  #crosshair .tick { stroke: var(--cream); stroke-width: 2.2; stroke-linecap: round; }
-  #crosshair .dot  { fill: var(--sky); }
-  #crosshair.locked { transform: scale(1.18); }
-  #crosshair.locked .ring, #crosshair.locked .tick { stroke: var(--red); opacity: 1; }
-  #crosshair.locked .dot { fill: var(--red); }
-
-  /* corner brackets that sit on the locked enemy */
+  /* ---------- aim lock ---------- */
   #lockon {
     position: absolute; left: 0; top: 0;
     width: 60px; height: 60px; transform: translate(-50%, -50%);
@@ -374,13 +359,6 @@
     <span class="hint"><kbd>R</kbd> Restart</span>
   </div>
 
-  <div id="crosshair">
-    <svg viewBox="0 0 38 38" aria-hidden="true">
-      <circle class="ring" cx="19" cy="19" r="12"/>
-      <path class="tick" d="M19 1.5v6M19 30.5v6M1.5 19h6M30.5 19h6"/>
-      <circle class="dot" cx="19" cy="19" r="2.2"/>
-    </svg>
-  </div>
   <div id="lockon"><i></i><i></i><i></i><i></i></div>
 
   <div id="toast"></div>

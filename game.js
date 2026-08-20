@@ -571,7 +571,7 @@ function fireRepulsor() {
   _mz.set(p.pos.x + fx * 0.7, p.pos.y + 0.25, p.pos.z + fz * 0.7);   // palm muzzle
 
   // Send the bolt through the point the reticle covers, so what you see under
-  // the crosshair is what you hit. A locked target overrides with a homing line.
+  // the lock marker sits on is what you hit, and a lock overrides with a homing line.
   _aim.copy(camTarget).sub(camera.position).normalize();
   _aim.multiplyScalar(38).add(camera.position).sub(_mz).normalize();
   // A locked bolt is aimed from the palm itself, not down the camera's sight
@@ -1086,7 +1086,6 @@ const hud = {
   pip: document.getElementById('gaugePip'),
   toast: document.getElementById('toast'),
   ko: document.getElementById('koCount'),
-  cross: document.getElementById('crosshair'),
   lock: document.getElementById('lockon'),
   hearts: Array.from(document.querySelectorAll('#hearts .heart')),
 };
@@ -1269,20 +1268,17 @@ const _tv = new THREE.Vector3();
 function updateReticle() {
   if (!started || won) {
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   const t = findTarget();
   if (!t) {
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   _tv.set(t.e.obj.position.x, t.e.obj.position.y + t.e.height * 0.55, t.e.obj.position.z);
   _tv.project(camera);
   if (_tv.z > 1) {                       // behind the camera
     hud.lock.classList.remove('on');
-    hud.cross.classList.remove('locked');
     return;
   }
   const size = clamp(760 / Math.max(4, t.d), 30, 110);
@@ -1291,7 +1287,6 @@ function updateReticle() {
   hud.lock.style.left = ((_tv.x * 0.5 + 0.5) * innerWidth) + 'px';
   hud.lock.style.top = ((-_tv.y * 0.5 + 0.5) * innerHeight) + 'px';
   hud.lock.classList.add('on');
-  hud.cross.classList.add('locked');
 }
 
 function formatTime(s) {
