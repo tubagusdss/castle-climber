@@ -504,8 +504,8 @@ const C = {
 
 // ---------- scene ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x8fd7ff);
-scene.fog = new THREE.Fog(0xa9e2ff, 90, 320);
+scene.background = new THREE.Color(0x3b3157);
+scene.fog = new THREE.Fog(0x453a63, 70, 300);       // haze up the shaft, colours still read
 
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 900);
 
@@ -518,18 +518,21 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.getElementById('stage').appendChild(renderer.domElement);
 
 // ---------- lights ----------
-// warm ground bounce, not green - green bounce turns every cream face olive
-scene.add(new THREE.HemisphereLight(0xeaf7ff, 0xd8c3a0, 1.25));
-const fill = new THREE.DirectionalLight(0xbfe4ff, 0.42);
-fill.position.set(-55, 26, -38);
+// Indoors: a low warm fill, cool daylight leaking from the windows, and the
+// torches (point lights placed with the sconces) doing the real work.
+scene.add(new THREE.HemisphereLight(0xfff3dc, 0x554a75, 1.5));
+const fill = new THREE.DirectionalLight(0xcfe4ff, 0.7);
+fill.position.set(-30, 30, 60);
 scene.add(fill);
-const sun = new THREE.DirectionalLight(0xfff4dd, 1.35);
-sun.position.set(48, 92, 40);
+const lamp = new THREE.PointLight(0xffd6a0, 1.9, 40, 2);
+scene.add(lamp);
+const sun = new THREE.DirectionalLight(0xffeccd, 0.75);
+sun.position.set(28, 60, 46);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 10;
 sun.shadow.camera.far = 260;
-const S = 70;
+const S = 46;
 sun.shadow.camera.left = -S; sun.shadow.camera.right = S;
 sun.shadow.camera.top = S;   sun.shadow.camera.bottom = -S;
 sun.shadow.bias = -0.0012;
@@ -587,268 +590,484 @@ function cyl(rTop, rBot, h, seg, x, y, z, color, o = {}) {
 }
 
 // ============================================================
-//  THE CASTLE
+//  THE CASTLE - twenty storeys of galleries around an open central shaft
 // ============================================================
-const TOWER = 11;          // tower is a TOWER x TOWER square prism
-const TOWER_TOP = 54;      // roof deck height
-const spinners = [];       // decorative rotators
+const spinners = [];       // torch flames and other decorative animators
 const movers = [];         // moving platforms
 const gems = [];
 const pads = [];           // bounce pads
+const doors = [];          // swinging doors, opened by walking up to them
 
-// --- ground ---
-box(260, 4, 260, 0, -2, 0, C.grass, { shadow: true });
-// grass patchwork
-for (let i = 0; i < 26; i++) {
-  const a = Math.random() * Math.PI * 2, r = 26 + Math.random() * 92;
-  box(6 + Math.random() * 12, 0.12, 6 + Math.random() * 12,
-      Math.cos(a) * r, 0.06, Math.sin(a) * r, C.grass2, { solid: false });
-}
-// moat-ish courtyard ring
-cyl(26, 26, 0.3, 48, 0, 0.16, 0, C.stone, { flat: false }).receiveShadow = true;
+const STONE = 0xc3b598, STONE_D = 0x9d9078, STONE_L = 0xded2b6;
+const FLOOR_A = 0xcdbfa2, FLOOR_B = 0xb5a68a;
+const WOOD = 0x8d5524, WOOD_D = 0x6b4b2a;
+const RUG = 0xb3324f, WINDOW_LIT = 0xdff1ff;
 
-// --- central tower: stacked colored bands ---
-const bandColors = [0xffe9c4, 0xffc0cb, 0xfff3dc, 0xbfe8ff, 0xfff3dc, 0xd6c8ff, 0xffe9c4];
-const BANDS = 7, bandH = TOWER_TOP / BANDS;
-for (let i = 0; i < BANDS; i++) {
-  box(TOWER, bandH, TOWER, 0, bandH * i + bandH / 2, 0, bandColors[i % bandColors.length]);
-  // trim stripe
-  box(TOWER + 0.5, 0.5, TOWER + 0.5, 0, bandH * (i + 1), 0, i % 2 ? C.grape : C.red, { solid: false });
+const FLOORS = 20;            // walkways stacked around the shaft
+const STOREY = 6.0;           // floor to floor
+const VOID = 11;              // half-width of the open shaft
+const RING = 21;              // half-width of the building
+const SLAB_T = 0.7, WALL_T = 0.8, DOOR_W = 4.4, DOOR_H = 5.0;
+const PARAPET = 1.3;
+const floorY = n => n * STOREY;
+// Each gallery gets its own colour so the shaft reads as a stack of bands.
+const BANDS = [
+  { wall: 0xf2b8c6, trim: 0xef476f, deck: 0xffe3ea },
+  { wall: 0xffd9a0, trim: 0xff9f1c, deck: 0xfff0d6 },
+  { wall: 0xc9edb4, trim: 0x06d6a0, deck: 0xe8f8dd },
+  { wall: 0xbfe3f7, trim: 0x4cc9f0, deck: 0xe4f4fd },
+  { wall: 0xd9c8f5, trim: 0x9b5de5, deck: 0xefe7fb },
+  { wall: 0xffe9a8, trim: 0xffd166, deck: 0xfff6dc },
+];
+const band = n => BANDS[n % BANDS.length];
+const TOP_Y = floorY(FLOORS - 1);
+const GOAL_Y = TOP_Y + 2.6;
+
+// ------------------------------------------------------------
+//  Building blocks
+// ------------------------------------------------------------
+function slabBox(cx, cz, w, d, top, color) {
+  box(w, SLAB_T, d, cx, top - SLAB_T / 2, cz, color);
 }
-// windows + banners on the tower faces
-for (let i = 1; i < BANDS; i++) {
-  const y = bandH * i + bandH * 0.45;
-  for (let f = 0; f < 4; f++) {
-    const a = f * Math.PI / 2;
-    const nx = Math.sin(a), nz = Math.cos(a);
-    box(1.5, 2.4, 0.35, nx * (TOWER / 2 + 0.1), y, nz * (TOWER / 2 + 0.1), C.dark, { solid: false, rotY: a });
-    box(1.1, 0.9, 0.2, nx * (TOWER / 2 + 0.3), y + 0.5, nz * (TOWER / 2 + 0.3), C.sky, { solid: false, rotY: a });
+function tiles(cx, cz, w, d, top, a, b) {
+  const n = Math.floor(w / 3), m = Math.floor(d / 3);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      if ((i + j) % 2) continue;
+      box(2.7, 0.06, 2.7, cx - w / 2 + 1.5 + i * 3, top + 0.03, cz - d / 2 + 1.5 + j * 3,
+          a, { solid: false, shadow: false });
+    }
   }
 }
-
-// --- roof deck + battlements + spire ---
-box(TOWER + 3, 1.2, TOWER + 3, 0, TOWER_TOP + 0.6, 0, C.stone2, { tag: 'roof' });
-for (let i = 0; i < 4; i++) {
-  const a = i * Math.PI / 2, r = (TOWER + 3) / 2 - 0.45;
-  for (let j = -2; j <= 2; j++) {
-    const px = Math.cos(a) * r - Math.sin(a) * j * 1.5;
-    const pz = -Math.sin(a) * r - Math.cos(a) * j * 1.5;
-    if (Math.abs(j) === 2 && i % 2) continue;
-    box(1.0, 1.5, 1.0, px, TOWER_TOP + 1.95, pz, j % 2 ? C.red : C.cream, { solid: false });
+/** Straight wall with optional door openings measured along its length. */
+function wall(x1, z1, x2, z2, base, h, color, gaps) {
+  const horizontal = Math.abs(x2 - x1) > Math.abs(z2 - z1);
+  const len = horizontal ? Math.abs(x2 - x1) : Math.abs(z2 - z1);
+  const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+  const start = horizontal ? Math.min(x1, x2) : Math.min(z1, z2);
+  const segs = [];
+  let cursor = 0;
+  for (const g of (gaps || []).slice().sort((a, b) => a.at - b.at)) {
+    const from = g.at - g.w / 2, to = g.at + g.w / 2;
+    if (from - cursor > 0.02) segs.push([cursor, from]);
+    cursor = to;
+    const lh = h - DOOR_H, mid = start + g.at;
+    if (lh > 0.05) {
+      if (horizontal) box(g.w, lh, WALL_T, mid, base + DOOR_H + lh / 2, cz, color);
+      else box(WALL_T, lh, g.w, cx, base + DOOR_H + lh / 2, mid, color);
+    }
+  }
+  if (len - cursor > 0.02) segs.push([cursor, len]);
+  for (const [a, b] of segs) {
+    const segLen = b - a, mid = start + (a + b) / 2;
+    if (horizontal) box(segLen, h, WALL_T, mid, base + h / 2, cz, color);
+    else box(WALL_T, h, segLen, cx, base + h / 2, mid, color);
   }
 }
-
-// --- corner turrets with cone roofs ---
-const turretColors = [C.red, C.mint, C.grape, C.gold];
-for (let i = 0; i < 4; i++) {
-  const a = Math.PI / 4 + i * Math.PI / 2;
-  const r = TOWER * 0.72;
-  const x = Math.cos(a) * r, z = Math.sin(a) * r;
-  const h = 20 + i * 4;
-  cyl(2.1, 2.3, h, 12, x, h / 2, z, C.cream);
-  solids.push({ obj: { position: new THREE.Vector3(x, h / 2, z) }, hx: 2.0, hy: h / 2, hz: 2.0, rotY: 0, prev: new THREE.Vector3(x, h / 2, z) });
-  cyl(0.01, 3.1, 4.2, 12, x, h + 2.1, z, turretColors[i], { flat: true });
-  // pennant
-  const pole = cyl(0.09, 0.09, 3, 6, x, h + 5.6, z, 0x6b4b2a); pole.castShadow = false;
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.0), mat(turretColors[(i + 2) % 4], { side: THREE.DoubleSide }));
-  flag.position.set(x + 0.9, h + 6.4, z);
-  scene.add(flag);
-  spinners.push({ obj: flag, wave: true, base: flag.position.clone(), phase: i });
+function swingDoor(hx, hz, w, base, closedAngle, swing) {
+  const panel = box(w, DOOR_H - 0.25, 0.3, hx, base + (DOOR_H - 0.25) / 2, hz, WOOD, { tag: 'door' });
+  const col = solids[solids.length - 1];
+  const trim = new THREE.Mesh(boxGeo, mat(WOOD_D));
+  trim.scale.set(1.02 / w, 0.12 / (DOOR_H - 0.25), 1.35);
+  trim.position.set(0, 0.28, 0);
+  panel.add(trim);
+  const d = { mesh: panel, col, hx, hz, w, y: base + (DOOR_H - 0.25) / 2,
+              closed: closedAngle, open: closedAngle + swing, a: closedAngle };
+  doors.push(d);
+  placeDoor(d);
+  return d;
 }
-
-// ============================================================
-//  SPIRAL STAIRCASE  (courtyard -> the landing)
-//  Nothing solid ever overhangs the flight, so you can never bump your
-//  head on the level above while climbing.
-// ============================================================
-const STEPS = 68, STAIR_R = 9.6;
-const STAIR_A0 = Math.PI / 2;      // the flight starts on the courtyard side
-const STAIR_Y0 = 0.8, STAIR_RISE = 0.4, STAIR_TURNS = 2.15;
-const stairA = i => STAIR_A0 + (i / (STEPS - 1)) * STAIR_TURNS * Math.PI * 2;
-const stairY = i => STAIR_Y0 + i * STAIR_RISE;
-
-for (let i = 0; i < STEPS; i++) {
-  const a = stairA(i), y = stairY(i);
-  const x = Math.cos(a) * STAIR_R, z = Math.sin(a) * STAIR_R;
-  box(3.4, 0.5, 2.3, x, y, z, i % 2 ? C.stone : C.stone2, { rotY: -a });
-  // outer railing posts
-  if (i % 3 === 0) {
-    const rr = STAIR_R + 1.5;
-    box(0.35, 2.0, 0.35, Math.cos(a) * rr, y + 1.1, Math.sin(a) * rr, C.wood, { solid: false });
-    box(0.9, 0.35, 0.9, Math.cos(a) * rr, y + 2.2, Math.sin(a) * rr, i % 6 ? C.mint : C.red, { solid: false });
+function placeDoor(d) {
+  d.mesh.rotation.y = d.a;
+  d.mesh.position.set(d.hx + Math.cos(d.a) * d.w / 2, d.y, d.hz - Math.sin(d.a) * d.w / 2);
+  d.col.rotY = d.a;
+}
+function torch(x, y, z) {
+  box(0.24, 0.7, 0.24, x, y, z, WOOD_D, { solid: false, shadow: false });
+  const flame = box(0.5, 0.7, 0.5, x, y + 0.6, z, 0xffa62b,
+                    { solid: false, shadow: false, emissive: 0x8a3b00 });
+  spinners.push({ obj: flame, flicker: true, base: flame.position.clone() });
+}
+function window_(x, y, z, w, h, rotY) {
+  box(w, h, 0.3, x, y, z, 0x6a5a44, { solid: false, rotY });
+  box(w - 0.5, h - 0.5, 0.2, x, y, z, WINDOW_LIT, { solid: false, shadow: false, rotY, emissive: 0x7fa6c4 });
+}
+function pillar(x, z, base, h) {
+  box(1.7, 0.4, 1.7, x, base + 0.2, z, STONE_D);
+  box(1.3, h - 0.8, 1.3, x, base + h / 2, z, STONE);
+  box(1.7, 0.4, 1.7, x, base + h - 0.2, z, STONE_D);
+}
+function crate(x, y, z, s) {
+  box(s, s, s, x, y + s / 2, z, WOOD, { rotY: Math.random() * 0.4 - 0.2 });
+  box(s * 1.04, s * 0.12, s * 1.04, x, y + s * 0.75, z, WOOD_D, { solid: false });
+}
+function barrel(x, y, z) {
+  const b = cyl(0.55, 0.48, 1.2, 10, x, y + 0.6, z, WOOD_D);
+  solids.push({ obj: b, hx: 0.52, hy: 0.6, hz: 0.52, rotY: 0, prev: b.position.clone() });
+  cyl(0.58, 0.58, 0.12, 10, x, y + 0.9, z, 0xc0a060);
+}
+function table(x, y, z, w, d) {
+  box(w, 0.25, d, x, y + 1.15, z, WOOD);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    box(0.22, 1.05, 0.22, x + sx * (w / 2 - 0.4), y + 0.52, z + sz * (d / 2 - 0.4), WOOD_D, { solid: false });
   }
 }
-
-// ============================================================
-//  THE LANDING - top of the stairs, where the jumping starts
-// ============================================================
-const LAND_A = stairA(STEPS - 1);
-const LAND_TOP = stairY(STEPS - 1) + 0.25;          // flush with the last step
-const LAND_R = 12.0;
-const LAND_X = Math.cos(LAND_A) * LAND_R, LAND_Z = Math.sin(LAND_A) * LAND_R;
-
-box(8.0, 1.2, 7.0, LAND_X, LAND_TOP - 0.6, LAND_Z, C.stone2, { rotY: -LAND_A });
-box(7.0, 0.12, 6.0, LAND_X, LAND_TOP + 0.06, LAND_Z, C.cream, { solid: false, rotY: -LAND_A });
-// crenellated parapet around the outer half of the landing
-for (let j = -3; j <= 3; j++) {
-  const ox = Math.cos(LAND_A) * 3.3 - Math.sin(LAND_A) * j * 1.25;
-  const oz = -Math.sin(LAND_A) * 3.3 - Math.cos(LAND_A) * j * 1.25;
-  box(1.0, 1.5, 0.9, LAND_X + ox, LAND_TOP + 0.75, LAND_Z + oz,
-      j % 2 ? C.cream : C.grape, { solid: false, rotY: -LAND_A });
+function shelf(x, y, z, w, rotY) {
+  box(w, 3.4, 0.9, x, y + 1.7, z, WOOD_D, { rotY });
+  for (let i = 0; i < 3; i++) {
+    box(w - 0.4, 0.5, 0.5, x, y + 0.7 + i * 1.1, z, [0xd15c5c, 0x4f8ac4, 0xd6b04a][i], { solid: false, rotY });
+  }
 }
-// torches marking the landing
-for (const side of [-1, 1]) {
-  const tx = LAND_X - Math.sin(LAND_A) * side * 3.2;
-  const tz = LAND_Z - Math.cos(LAND_A) * side * 3.2;
-  box(0.4, 2.4, 0.4, tx, LAND_TOP + 1.2, tz, C.wood, { solid: false });
-  const fire = box(0.9, 1.1, 0.9, tx, LAND_TOP + 2.8, tz, 0xffa62b,
-                   { solid: false, shadow: false, emissive: 0x8a3b00 });
-  spinners.push({ obj: fire, flicker: true, base: fire.position.clone() });
-}
-
-// ============================================================
-//  FLOATING JUMP COURSE (landing -> roof)
-//  A widening spiral of blocks. Every hop is roughly 6 across and 1.5 up,
-//  well inside a single jump; the double jump is the safety net.
-// ============================================================
-const platColors = [C.red, C.gold, C.mint, C.sky, C.grape];
-function platform(x, y, z, w = 5.6, d = 5.6, color = C.mint, o = {}) {
-  const top = box(w, 1.0, d, x, y, z, color, o);
-  box(w - 0.8, 0.5, d - 0.8, x, y - 0.7, z, C.cream, { solid: false, rotY: o.rotY || 0 });
+function platform(x, y, z, w = 4.0, d = 4.0, color = STONE_L, o = {}) {
+  const top = box(w, 0.9, d, x, y - 0.45, z, color, o);
+  box(w - 0.7, 0.5, d - 0.7, x, y - 1.1, z, STONE_D, { solid: false, rotY: o.rotY || 0 });
   return top;
 }
-function mover(x, y, z, axis, amp, speed, color, rotY) {
-  const m = platform(x, y, z, 7.0, 7.0, color, { tag: 'mover', rotY });
-  movers.push({ obj: m, base: new THREE.Vector3(x, y, z), axis, amp, speed, phase: Math.random() * 6.28 });
+function mover(x, y, z, axis, amp, speed, color) {
+  const m = platform(x, y, z, 4.2, 4.2, color, { tag: 'mover' });
+  movers.push({ obj: m, base: m.position.clone(), axis, amp, speed, phase: Math.random() * 6.28 });
   return m;
 }
-
-// Spacing is set from the jump envelope: at RUN_SPEED you cover ~8.7 units in the
-// air while rising 1.5, so hops sit at ~8 apart and the platforms are wide enough
-// that landing early or late still puts you on deck.
-const COURSE_N = 17;
-const COURSE_Y0 = LAND_TOP + 1.6, COURSE_Y1 = 53.4;
-const coursePts = [];
-for (let i = 0; i < COURSE_N; i++) {
-  const t = i / (COURSE_N - 1);
-  const a = LAND_A + 0.42 + t * 1.45 * Math.PI * 2;
-  const r = 12.8 + Math.sin(t * Math.PI) * 2.2;          // bulges outward mid-climb
-  coursePts.push({
-    x: Math.cos(a) * r,
-    y: COURSE_Y0 + t * (COURSE_Y1 - COURSE_Y0),
-    z: Math.sin(a) * r,
-    rotY: -a,
-  });
-}
-// Movers swing a little, never enough to push the next hop out of reach.
-const courseMeshes = coursePts.map((p, i) => {
-  const color = platColors[i % platColors.length];
-  if (i === 5)  return mover(p.x, p.y, p.z, 'x', 1.6, 0.8, C.gold, p.rotY);
-  if (i === 10) return mover(p.x, p.y, p.z, 'z', 1.6, 0.7, C.sky, p.rotY);
-  if (i === 14) return mover(p.x, p.y, p.z, 'y', 1.6, 0.55, C.red, p.rotY);
-  const w = i % 3 === 0 ? 6.8 : 6.0;
-  return platform(p.x, p.y, p.z, w, w, color, { rotY: p.rotY });
-});
-
-// --- bounce pads ---
 function bouncePad(x, y, z) {
-  const base = box(3.2, 0.7, 3.2, x, y, z, C.grape, { tag: 'pad' });
-  const top = box(2.6, 0.35, 2.6, x, y + 0.5, z, C.mint, { solid: false, emissive: 0x063b2a });
-  pads.push({ x, y, z, top, t: 0 });
+  const base = box(3.0, 0.7, 3.0, x, y + 0.35, z, 0x9b5de5, { tag: 'pad' });
+  const top = box(2.4, 0.35, 2.4, x, y + 0.85, z, 0x06d6a0, { solid: false, emissive: 0x063b2a });
+  pads.push({ x, y: y + 0.35, z, top, t: 0 });
   return base;
 }
-bouncePad(-4.5, 1.0, 22.5);   // off to the side of the run-up, not in the way
-bouncePad(-22, 1.0, -8);
-// a victory trampoline on the roof deck (a pad mid-course would fling you off it)
-bouncePad(4.6, TOWER_TOP + 1.55, 4.6);
-
-// --- courtyard plaza & the walkway that feeds the staircase ---
-box(15, 1.2, 15, 0, 0, 20, C.stone2);                 // top at y = 0.6
-for (let ix = -3; ix <= 3; ix++) {                     // checkerboard inlay (flat, walk-through)
-  for (let iz = -3; iz <= 3; iz++) {
-    if ((ix + iz) % 2) continue;
-    box(1.9, 0.06, 1.9, ix * 2.0, 0.63, 20 + iz * 2.0, C.cream, { solid: false, shadow: false });
-  }
-}
-box(6.0, 0.7, 7.5, 0, 0.0, 12.6, C.stone);            // walkway, top at y = 0.35
-box(6.6, 0.25, 0.9, 0, 0.35, 8.9, C.gold, { solid: false });   // threshold stripe at the stair foot
-
-// --- decorative trees & rocks ---
-for (let i = 0; i < 30; i++) {
-  const a = Math.random() * Math.PI * 2, r = 32 + Math.random() * 78;
-  const x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (Math.random() < 0.75) {
-    box(0.9, 3.2, 0.9, x, 1.6, z, C.wood, { solid: false });
-    const leaf = [0x4ecb71, 0x2fb35a, 0x8ad66b][i % 3];
-    box(3.6, 2.6, 3.6, x, 4.0, z, leaf, { solid: false, rotY: Math.random() });
-    box(2.4, 2.0, 2.4, x, 5.6, z, leaf, { solid: false, rotY: Math.random() });
-  } else {
-    box(2.2, 1.6, 2.0, x, 0.7, z, 0xb9b3c9, { solid: false, rotY: Math.random() });
-  }
-}
-
-// --- clouds ---
-for (let i = 0; i < 22; i++) {
-  const g = new THREE.Group();
-  const n = 3 + (i % 3);
-  for (let j = 0; j < n; j++) {
-    const s = 3 + Math.random() * 4;
-    const p = new THREE.Mesh(boxGeo, mat(0xffffff, { opacity: 0.92 }));
-    p.scale.set(s * 1.7, s * 0.8, s * 1.4);
-    p.position.set((j - n / 2) * s * 1.1, Math.random() * 1.2, Math.random() * 2);
-    g.add(p);
-  }
-  const a = Math.random() * Math.PI * 2, r = 55 + Math.random() * 90;
-  g.position.set(Math.cos(a) * r, 22 + Math.random() * 48, Math.sin(a) * r);
-  scene.add(g);
-  spinners.push({ obj: g, drift: 0.25 + Math.random() * 0.4, base: g.position.clone() });
-}
-
-// ============================================================
-//  GEMS
-// ============================================================
 const gemGeo = new THREE.OctahedronGeometry(0.55);
 function gem(x, y, z) {
-  const m = new THREE.Mesh(gemGeo, mat(C.gold, { emissive: 0x6b4400, flat: true }));
+  const m = new THREE.Mesh(gemGeo, mat(0xffd166, { emissive: 0x6b4400, flat: true }));
   m.position.set(x, y, z);
   m.castShadow = true;
   scene.add(m);
   gems.push({ obj: m, taken: false, base: y });
 }
-// gems along the stairs
-for (let i = 4; i < STEPS; i += 6) {
-  const a = stairA(i);
-  gem(Math.cos(a) * STAIR_R, stairY(i) + 1.6, Math.sin(a) * STAIR_R);
-}
-// gems on the course and on the landing
-coursePts.forEach(p => gem(p.x, p.y + 1.9, p.z));
-gem(LAND_X, LAND_TOP + 1.6, LAND_Z);
-gem(-4.5, 3.0, 22.5); gem(-22, 3.0, -8);
-gem(4.6, TOWER_TOP + 9.5, 4.6);      // only reachable off the roof trampoline
-gem(0, TOWER_TOP + 3.2, 0);
-const GEM_TOTAL = gems.length;
 
-// ============================================================
-//  GOAL - the crown on the roof
-// ============================================================
+// ------------------------------------------------------------
+//  Geometry of one gallery: the walkway ring, its parapet and the
+//  flight of stairs that carries you to the floor above. Each flight
+//  hangs over the shaft on the next side round, so the climb spirals
+//  and the middle of the castle stays open all the way to the roof.
+// ------------------------------------------------------------
+const SIDES = [
+  { ax: 'x', fixed: -1, sign: 1 },   // 0: north side, running east
+  { ax: 'z', fixed: 1, sign: 1 },    // 1: east side, running south
+  { ax: 'x', fixed: 1, sign: -1 },   // 2: south side, running west
+  { ax: 'z', fixed: -1, sign: -1 },  // 3: west side, running north
+];
+const STAIR_R = VOID - 2.2;          // the flights hang inside the shaft
+const STAIR_STEPS = 12, STAIR_RUN = 9.8, STAIR_W = 4.2;
+
+function sidePoint(side, along, radius) {
+  const s = SIDES[side];
+  return s.ax === 'x'
+    ? { x: along, z: s.fixed * radius }
+    : { x: s.fixed * radius, z: along };
+}
+
+const ASCENTS = ['stairs', 'blocks', 'lift', 'ramp'];
+const ascentOf = n => ASCENTS[n % ASCENTS.length];
+
+/** Builds the way up from floor n, returning the ends of the route. */
+function buildAscent(n) {
+  const side = n % 4, s = SIDES[side], b = band(n);
+  const y0 = floorY(n), y1 = floorY(n + 1);
+  const kind = ascentOf(n);
+  const pts = [];
+  const reach = kind === 'lift' ? 3.4 : STAIR_RUN / 2 + 1.6;
+  const foot = sidePoint(side, -reach * s.sign, STAIR_R);
+  const head = sidePoint(side, reach * s.sign, STAIR_R);
+  platform(foot.x, y0, foot.z, s.ax === 'x' ? 3.6 : STAIR_W, s.ax === 'x' ? STAIR_W : 3.6, b.deck);
+  platform(head.x, y1, head.z, s.ax === 'x' ? 3.6 : STAIR_W, s.ax === 'x' ? STAIR_W : 3.6, band(n + 1).deck);
+
+  if (kind === 'stairs') {
+    const rise = (y1 - y0) / STAIR_STEPS, depth = STAIR_RUN / STAIR_STEPS;
+    const from = -STAIR_RUN / 2 * s.sign;
+    for (let i = 0; i < STAIR_STEPS; i++) {
+      const along = from + s.sign * (i + 0.5) * depth;
+      const p = sidePoint(side, along, STAIR_R);
+      const y = y0 + rise * (i + 1) - rise / 2;
+      box(s.ax === 'x' ? depth + 0.06 : STAIR_W, rise + 0.08, s.ax === 'x' ? STAIR_W : depth + 0.06,
+          p.x, y, p.z, i % 2 ? b.deck : b.trim);
+    }
+  } else if (kind === 'blocks') {
+    // four chunky blocks stepping up over the shaft, staggered left and right
+    const cnt = 4;
+    for (let i = 0; i < cnt; i++) {
+      const t = (i + 1) / (cnt + 1);
+      const along = (-STAIR_RUN / 2 + t * STAIR_RUN) * s.sign;
+      const wob = i % 2 ? 1.5 : -1.5;
+      const p = sidePoint(side, along, STAIR_R + wob);
+      const y = y0 + (y1 - y0) * t;
+      platform(p.x, y, p.z, 4.8, 4.8, i % 2 ? b.trim : band(n + 1).trim);
+      pts.push({ x: p.x, y, z: p.z, kind: 'block' });
+      if (i === 2) gem(p.x, y + 1.6, p.z);
+    }
+  } else if (kind === 'lift') {
+    // a counterweighted lift: wait for the car, ride it, step off at the top
+    const mid = sidePoint(side, 0, STAIR_R);
+    const car = platform(mid.x, (y0 + y1) / 2, mid.z, 4.6, 4.6, b.trim, { tag: 'mover' });
+    movers.push({ obj: car, base: car.position.clone(), axis: 'y',
+                  amp: (y1 - y0) / 2 + 0.55, speed: 0.34, phase: 0 });
+    // guide rails and a lamp so it reads as a lift
+    for (const o of [-1, 1]) {
+      const rail = sidePoint(side, o * 2.6, STAIR_R);
+      box(0.35, y1 - y0 + 2.4, 0.35, rail.x, (y0 + y1) / 2 + 0.6, rail.z, 0x6b6b7a, { solid: false });
+    }
+    box(1.2, 0.3, 1.2, mid.x, y1 + 0.4, mid.z, b.trim, { solid: false, emissive: 0x332200 });
+    pts.push({ x: mid.x, y: (y0 + y1) / 2, z: mid.z, kind: 'lift', car });
+  } else {
+    // a ramp: shallow steps you can run straight up
+    const steps = 26, rise = (y1 - y0) / steps, depth = STAIR_RUN / steps;
+    const from = -STAIR_RUN / 2 * s.sign;
+    for (let i = 0; i < steps; i++) {
+      const along = from + s.sign * (i + 0.5) * depth;
+      const p = sidePoint(side, along, STAIR_R);
+      const y = y0 + rise * (i + 1) - rise / 2;
+      box(s.ax === 'x' ? depth + 0.08 : STAIR_W + 0.6, rise + 0.1,
+          s.ax === 'x' ? STAIR_W + 0.6 : depth + 0.08, p.x, y, p.z,
+          i % 6 < 3 ? b.deck : b.trim);
+    }
+    // rails so the ramp reads as a ramp
+    for (const o of [-1, 1]) {
+      const r0 = sidePoint(side, from + s.sign * STAIR_RUN * 0.5, STAIR_R + o * (STAIR_W / 2 + 0.5));
+      box(s.ax === 'x' ? STAIR_RUN : 0.3, 0.5, s.ax === 'x' ? 0.3 : STAIR_RUN,
+          r0.x, (y0 + y1) / 2 + 0.9, r0.z, b.trim, { solid: false });
+    }
+  }
+  return { side, bottom: foot, top: head, y0, y1, kind, pts, reach };
+}
+
+/** Parapet along one side of the shaft, left open where a flight meets it. */
+function parapet(n, side, open) {
+  const s = SIDES[side];
+  const r = VOID;
+  const half = VOID;
+  const y = floorY(n);
+  const segs = open ? [[-half, -8.2], [8.2, half]] : [[-half, half]];   // wide enough for the landings
+  const bd = band(n);
+  for (const [a, b] of segs) {
+    const mid = (a + b) / 2, len = b - a;
+    const p = sidePoint(side, mid, r);
+    if (s.ax === 'x') {
+      box(len, PARAPET, 0.55, p.x, y + PARAPET / 2, p.z, bd.wall);
+      box(len, 0.22, 0.75, p.x, y + PARAPET, p.z, bd.trim, { solid: false });
+    } else {
+      box(0.55, PARAPET, len, p.x, y + PARAPET / 2, p.z, bd.wall);
+      box(0.75, 0.22, len, p.x, y + PARAPET, p.z, bd.trim, { solid: false });
+    }
+  }
+}
+
+function buildFloor(n) {
+  const y = floorY(n);
+  const strip = RING - VOID;
+  const b = band(n);
+  if (n === 0) {
+    slabBox(0, 0, RING * 2, RING * 2, y, b.deck);        // the hall at the bottom of the shaft
+    tiles(0, 0, RING * 2, RING * 2, y, b.trim);
+  } else {
+    slabBox(0, -(VOID + strip / 2), RING * 2, strip, y, b.deck);
+    slabBox(0, VOID + strip / 2, RING * 2, strip, y, b.deck);
+    slabBox(-(VOID + strip / 2), 0, strip, VOID * 2, y, b.deck);
+    slabBox(VOID + strip / 2, 0, strip, VOID * 2, y, b.deck);
+  }
+
+  // outer wall with window slits
+  const h = STOREY;
+  for (let side = 0; side < 4; side++) {
+    const s = SIDES[side];
+    const gaps = [];
+    if (n % 5 === 3 && side === (n + 2) % 4) gaps.push({ at: RING, w: DOOR_W });   // door to a side room
+    if (s.ax === 'x') {
+      wall(-RING, s.fixed * (RING + WALL_T / 2), RING, s.fixed * (RING + WALL_T / 2), y, h, b.wall, gaps);
+      box(RING * 2, 0.5, 0.4, 0, y + h - 0.4, s.fixed * RING, b.trim, { solid: false });
+      for (const wx of [-13, 13]) window_(wx, y + 3.0, s.fixed * RING, 2.2, 3.0, 0);
+    } else {
+      wall(s.fixed * (RING + WALL_T / 2), -RING, s.fixed * (RING + WALL_T / 2), RING, y, h, b.wall, gaps);
+      box(0.4, 0.5, RING * 2, s.fixed * RING, y + h - 0.4, 0, b.trim, { solid: false });
+      for (const wz of [-13, 13]) window_(s.fixed * RING, y + 3.0, wz, 2.2, 3.0, Math.PI / 2);
+    }
+  }
+
+  // corner pillars carry the gallery above
+  for (const px of [-16.5, 16.5]) for (const pz of [-16.5, 16.5]) pillar(px, pz, y, STOREY);
+
+  // torches on the inner corners
+  for (const tx of [-VOID - 1.2, VOID + 1.2]) for (const tz of [-VOID - 1.2, VOID + 1.2]) {
+    torch(tx, y + 3.2, tz);
+  }
+
+  // banners hung from the gallery lip into the shaft
+  if (n > 0) {
+    for (const side of [0, 2]) {
+      const p = sidePoint(side, side === 0 ? -6.5 : 6.5, VOID - 0.4);
+      const bn = box(2.0, 3.4, 0.15, p.x, y - 1.9, p.z, b.trim, { solid: false });
+      spinners.push({ obj: bn, wave: true, base: bn.position.clone(), phase: n });
+    }
+  }
+
+  // parapet around the shaft, open where this floor's flight leaves and
+  // where the flight from below arrives
+  const leaves = n % 4, arrives = (n + 3) % 4;
+  if (n > 0) {                       // the ground floor is solid, it needs no railing
+    for (let side = 0; side < 4; side++) {
+      parapet(n, side, side === leaves || side === arrives);
+    }
+  }
+}
+
+// ---------- raise the tower ----------
+const flights = [];
+for (let n = 0; n < FLOORS; n++) {
+  buildFloor(n);
+  if (n < FLOORS - 1) flights.push(buildAscent(n));
+}
+
+// roof over the shaft, with a skylight so the top reads from the ground floor
+slabBox(0, 0, RING * 2 + 2, RING * 2 + 2, floorY(FLOORS) + 2, STONE_D);
+box(14, 0.3, 14, 0, floorY(FLOORS) + 1.6, 0, WINDOW_LIT, { solid: false, shadow: false, emissive: 0x88b6d8 });
+for (let side = 0; side < 4; side++) {
+  const s = SIDES[side];
+  const p = sidePoint(side, 0, RING + WALL_T / 2);
+  if (s.ax === 'x') wall(-RING, p.z, RING, p.z, floorY(FLOORS - 1) + STOREY, 2.6, STONE_D);
+  else wall(p.x, -RING, p.x, RING, floorY(FLOORS - 1) + STOREY, 2.6, STONE_D);
+}
+
+// ---------- ground floor dressing ----------
+table(-7, 0, 8, 7, 2.4); table(7, 0, 8, 7, 2.4);
+crate(15, 0, -14, 1.6); crate(16.6, 0, -13.4, 1.3); crate(15.4, 0, -12.2, 1.1);
+barrel(-15, 0, 14); barrel(-16.3, 0, 14.6); barrel(-15.6, 0, 12.8);
+bouncePad(0, 0, -16);
+gem(0, 5.4, -16);
+
+// ---------- per-floor dressing, side rooms, hazards, treasure ----------
+for (let n = 0; n < FLOORS; n++) {
+  const y = floorY(n);
+  const strip = RING - VOID, mid = VOID + strip / 2;
+
+  // a couple of crates or barrels on the walkway
+  const c = SIDES[(n + 1) % 4];
+  const spot = sidePoint((n + 1) % 4, n % 2 ? 6 : -6, mid);
+  if (n % 3 === 0) { crate(spot.x, y, spot.z, 1.5); crate(spot.x + 1.7, y, spot.z, 1.2); }
+  else if (n % 3 === 1) { barrel(spot.x, y, spot.z); barrel(spot.x + 1.3, y, spot.z + 0.6); }
+
+  // shelves and a table in the side rooms
+  if (n % 5 === 3) {
+    const side = (n + 2) % 4;
+    const room = sidePoint(side, 0, mid);
+    shelf(room.x * 1.15, y, room.z * 1.15, 5.0, SIDES[side].ax === 'x' ? 0 : Math.PI / 2);
+    table(room.x * 0.72, y, room.z * 0.72, 4.0, 2.2);
+    const dp = sidePoint(side, -DOOR_W / 2, RING + WALL_T / 2);
+    if (SIDES[side].ax === 'x') swingDoor(dp.x, dp.z, DOOR_W, y, 0, -1.9);
+    else swingDoor(dp.x, dp.z, DOOR_W, y, Math.PI / 2, 1.9);
+  }
+
+  // every few floors a shortcut across the shaft, worth a gem
+  if (n > 0 && n % 4 === 2) {
+    const a = sidePoint(n % 4, 0, VOID - 3.5);
+    const b = sidePoint((n + 2) % 4, 0, VOID - 3.5);
+    platform(a.x, y, a.z, 3.6, 3.6, 0xb08fd6);
+    mover((a.x + b.x) / 2, y, (a.z + b.z) / 2, SIDES[n % 4].ax === 'x' ? 'x' : 'z', 3.0, 0.6, 0xb08fd6);
+    platform(b.x, y, b.z, 3.6, 3.6, 0xb08fd6);
+    gem((a.x + b.x) / 2, y + 1.6, (a.z + b.z) / 2);
+  }
+
+  // a blocker across the walkway: vault it, or squeeze round the end
+  if (n > 0 && n % 2 === 0) {
+    const side = (n + 3) % 4, s = SIDES[side], mid2 = VOID + (RING - VOID) / 2;
+    const p = sidePoint(side, 0, mid2);
+    const bb = band(n);
+    if (s.ax === 'x') {
+      box(1.1, 1.7, 6.4, p.x, y + 0.85, p.z, bb.trim);
+      box(1.4, 0.3, 6.8, p.x, y + 1.8, p.z, bb.wall, { solid: false });
+    } else {
+      box(6.4, 1.7, 1.1, p.x, y + 0.85, p.z, bb.trim);
+      box(6.8, 0.3, 1.4, p.x, y + 1.8, p.z, bb.wall, { solid: false });
+    }
+  }
+
+  // a springboard on some galleries, with a gem hanging over it
+  if (n > 0 && n % 4 === 1) {
+    const side = (n + 1) % 4, mid3 = VOID + (RING - VOID) / 2;
+    const p = sidePoint(side, 5.5, mid3);
+    bouncePad(p.x, y, p.z);
+    gem(p.x, y + 5.4, p.z);
+  }
+
+  // gems: one by the stairs, one out on the walkway
+  const g1 = sidePoint(n % 4, 0, VOID + 2.2);
+  gem(g1.x, y + 1.6, g1.z);
+  const g2 = sidePoint((n + 2) % 4, n % 2 ? 7 : -7, mid);
+  gem(g2.x, y + 1.6, g2.z);
+}
+
+// ---------- the crown, on a bridge out over the shaft at the very top ----------
+const topSide = (FLOORS - 1) % 4;
+const bridgeFrom = sidePoint(topSide, 0, VOID);
+platform(bridgeFrom.x * 0.62, TOP_Y, bridgeFrom.z * 0.62, 5.0, 5.0, STONE_L);
+platform(0, TOP_Y, 0, 7.0, 7.0, STONE_L);
+box(9, 0.5, 9, 0, TOP_Y - 1.1, 0, 0xffd166, { solid: false });
+for (const a of [0, 1, 2, 3]) {
+  const p = sidePoint(a, 0, 3.6);
+  box(0.6, 2.4, 0.6, p.x, TOP_Y + 1.2, p.z, STONE_D);
+}
+
 const goal = new THREE.Group();
-goal.position.set(0, TOWER_TOP + 3.4, 0);
-const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.7, 0.9, 10), mat(C.gold, { emissive: 0x6b4400, flat: true }));
-goal.add(crownBase);
+goal.position.set(0, GOAL_Y, 0);
+goal.add(new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.7, 0.9, 10),
+                        mat(0xffd166, { emissive: 0x6b4400, flat: true })));
 for (let i = 0; i < 8; i++) {
   const a = i / 8 * Math.PI * 2;
-  const spike = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.5, 6), mat(C.gold, { emissive: 0x6b4400, flat: true }));
+  const spike = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1.5, 6),
+                               mat(0xffd166, { emissive: 0x6b4400, flat: true }));
   spike.position.set(Math.cos(a) * 1.35, 1.0, Math.sin(a) * 1.35);
   goal.add(spike);
-  const jewel = new THREE.Mesh(new THREE.OctahedronGeometry(0.26), mat(i % 2 ? C.red : C.sky, { emissive: 0x330011, flat: true }));
+  const jewel = new THREE.Mesh(new THREE.OctahedronGeometry(0.26),
+                               mat(i % 2 ? 0xef476f : 0x4cc9f0, { emissive: 0x330011, flat: true }));
   jewel.position.set(Math.cos(a) * 1.35, 1.85, Math.sin(a) * 1.35);
   goal.add(jewel);
 }
 goal.traverse(o => { o.castShadow = true; });
 scene.add(goal);
-const goalLight = new THREE.PointLight(0xffd166, 2.2, 26, 2);
-goalLight.position.set(0, TOWER_TOP + 5, 0);
+const goalLight = new THREE.PointLight(0xffd166, 2.6, 34, 2);
+goalLight.position.set(0, GOAL_Y + 1.5, 0);
 scene.add(goalLight);
+gem(0, TOP_Y + 1.6, 4.5);
+const GEM_TOTAL = gems.length;
+
+// ---------- the way up, for the movement tests ----------
+const ROUTE = [];
+const WALKWAY_R = VOID + (RING - VOID) / 2;
+flights.forEach((f, fi) => {
+  const s = SIDES[f.side];
+  // step off the gallery onto the deck at the foot of the way up
+  const onRamp = sidePoint(f.side, -f.reach * s.sign, WALKWAY_R);
+  ROUTE.push({ x: onRamp.x, y: f.y0, z: onRamp.z, kind: 'walk',
+               note: 'floor ' + (f.y0 / STOREY) + ' approach' });
+  ROUTE.push({ x: f.bottom.x, y: f.y0, z: f.bottom.z, kind: 'walk',
+               note: 'floor ' + (f.y0 / STOREY) + ' ' + f.kind + ' foot' });
+  for (const p of f.pts) {
+    ROUTE.push({ x: p.x, y: p.y, z: p.z, kind: p.kind, car: p.car,
+                 note: 'floor ' + (f.y0 / STOREY) + ' ' + p.kind });
+  }
+  ROUTE.push({ x: f.top.x, y: f.y1, z: f.top.z, kind: 'walk',
+               note: 'floor ' + (f.y1 / STOREY) + ' landing' });
+  // back onto the gallery, then round the corner toward the next way up
+  const offRamp = sidePoint(f.side, f.reach * s.sign, WALKWAY_R);
+  ROUTE.push({ x: offRamp.x, y: f.y1, z: offRamp.z, kind: 'walk',
+               note: 'floor ' + (f.y1 / STOREY) + ' gallery' });
+  const bnext = SIDES[(f.side + 1) % 4];
+  const corner = s.ax === 'x'
+    ? { x: bnext.fixed * WALKWAY_R, z: s.fixed * WALKWAY_R }
+    : { x: s.fixed * WALKWAY_R, z: bnext.fixed * WALKWAY_R };
+  ROUTE.push({ x: corner.x, y: f.y1, z: corner.z, kind: 'walk',
+               note: 'floor ' + (f.y1 / STOREY) + ' corner' });
+});
+const shaftEdge = sidePoint(topSide, 0, VOID + 2.2);
+ROUTE.push({ x: shaftEdge.x, y: TOP_Y, z: shaftEdge.z, kind: 'walk', note: 'shaft edge' });
+ROUTE.push({ x: bridgeFrom.x * 0.62, y: TOP_Y, z: bridgeFrom.z * 0.62, kind: 'block', note: 'crown bridge' });
+ROUTE.push({ x: 0, y: TOP_Y, z: 0, kind: 'block', note: 'the crown platform' });
 
 // ============================================================
 //  ENEMIES - lumbering monsters and patrolling robots
@@ -1015,7 +1234,9 @@ const _mz = new THREE.Vector3(), _aim = new THREE.Vector3();
 /** Is this point inside any solid block? Used to stop bolts at walls. */
 function pointSolid(v) {
   for (let i = 0; i < solids.length; i++) {
-    const s = solids[i], cp = s.obj.position;
+    const s = solids[i];
+    if (s.off) continue;
+    const cp = s.obj.position;
     const l = toLocal(v.x - cp.x, v.z - cp.z, s.rotY);
     if (Math.abs(l.x) < s.hx && Math.abs(v.y - cp.y) < s.hy && Math.abs(l.z) < s.hz) return true;
   }
@@ -1195,33 +1416,25 @@ function updateHearts() {
 
 
 // ---------- where they stand guard ----------
-spawnEnemy('monster', 9.5, 0, 17.5, { axis: 'x', amp: 3.0, leash: 5.0 });
-spawnEnemy('monster', -9.5, 0, 15.0, { axis: 'z', amp: 3.0, leash: 5.0 });
-spawnEnemy('monster', 13.5, 0, 27.0, { axis: 'x', amp: 2.4, leash: 4.5 });
-spawnEnemy('monster', -7.0, 0, 8.0, { axis: 'z', amp: 2.4, leash: 4.5 });
-spawnEnemy('robot', -21.0, 0, -6.0, { axis: 'x', amp: 3.0, leash: 5.0 });
-
-// one on the landing at the top of the stairs
-spawnEnemy('robot', LAND_X - Math.sin(LAND_A) * 2.0, LAND_TOP, LAND_Z - Math.cos(LAND_A) * 2.0,
-           { axis: 'x', amp: 1.2, leash: 2.2, detect: 7 });
-
-// robots on the three widest course platforms, parked toward the outer edge
-for (const i of [3, 6, 12]) {
-  const p = coursePts[i];
-  const r = Math.hypot(p.x, p.z);
-  spawnEnemy('robot', p.x + p.x / r * 1.9, p.y + 0.5, p.z + p.z / r * 1.9,
-             { axis: 'x', amp: 1.0, leash: 1.5, detect: 6, speedMul: 0.85 });
+// Two per gallery: one patrolling the walkway near the stairs, one further round.
+for (let n = 0; n < FLOORS; n++) {
+  const y = floorY(n), strip = RING - VOID, mid = VOID + strip / 2;
+  const nearStairs = sidePoint(n % 4, n % 2 ? 5 : -5, mid);
+  const across = sidePoint((n + 2) % 4, n % 2 ? -6 : 6, mid);
+  spawnEnemy(n % 2 ? 'robot' : 'monster', nearStairs.x, y, nearStairs.z,
+             { axis: SIDES[n % 4].ax, amp: 3.4, leash: 4.6, detect: 9 });
+  spawnEnemy(n % 3 ? 'monster' : 'robot', across.x, y, across.z,
+             { axis: SIDES[(n + 2) % 4].ax, amp: 3.4, leash: 4.6, detect: 9 });
 }
-
 // the big one guarding the crown
-spawnEnemy('robot', -3.8, TOWER_TOP + 1.2, -3.8,
-           { scale: 1.45, hpMul: 2, leash: 4.5, detect: 13, amp: 2.5, speedMul: 0.9 });
+spawnEnemy('robot', 2.5, TOP_Y, 2.5,
+           { scale: 1.45, hpMul: 2, leash: 3.0, detect: 14, amp: 2.0, speedMul: 0.9 });
 
 // ============================================================
 //  PLAYER - a brick-built hero, swappable from the start screen
 // ============================================================
 const HX = 0.55, HY = 1.35, HZ = 0.55;   // collider half-extents
-const SPAWN = new THREE.Vector3(0, 2.2, 24);
+const SPAWN = new THREE.Vector3(0, 1.4, 16);
 const TORSO_Y = 0.14;                    // rest height of the chest, bobbed while running
 
 const SKIN = 0xf2c48d, STEEL = 0xc7ced8, SILVER = 0xe8edf3, LEATHER = 0x7a4a24;
@@ -1675,7 +1888,7 @@ addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // yaw 0 puts the camera south of the player, looking north at the tower
-let yaw = 0, pitch = 0.16, camDist = 11;
+let yaw = 0, pitch = 0.16, camDist = 8;
 const SHOULDER = 1.15;   // sideways camera offset, in world units
 const canvas = renderer.domElement;
 
@@ -1704,7 +1917,7 @@ canvas.addEventListener('mousedown', e => {
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mouseup', () => { dragging = false; });
-addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY) * 0.9, 5, 22); }, { passive: true });
+addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY) * 0.9, 4, 15); }, { passive: true });
 
 // --- touch: left half = stick, right half = look, button = jump ---
 const touch = { stick: null, look: null, dx: 0, dy: 0 };
@@ -1818,6 +2031,7 @@ function toLocal(dx, dz, rotY) {
 }
 
 function overlaps(p, s) {
+  if (s.off) return false;
   const cp = s.obj.position;
   const l = toLocal(p.x - cp.x, p.z - cp.z, s.rotY);
   return Math.abs(l.x) < s.hx + HX && Math.abs(p.y - cp.y) < s.hy + HY && Math.abs(l.z) < s.hz + HZ;
@@ -1833,7 +2047,9 @@ function resolveAll(p, vel) {
   for (let iter = 0; iter < 3; iter++) {
     let hit = false;
     for (let i = 0; i < solids.length; i++) {
-      const s = solids[i], cp = s.obj.position;
+      const s = solids[i];
+      if (s.off) continue;
+      const cp = s.obj.position;
       const l = toLocal(p.x - cp.x, p.z - cp.z, s.rotY);
       const dy = p.y - cp.y;
       const ox = s.hx + HX - Math.abs(l.x);
@@ -1876,6 +2092,7 @@ function resolveAll(p, vel) {
 //  GAME STATE
 // ============================================================
 let started = false, won = false, time = 0, collected = 0, falls = 0, devPause = false;
+let simT = null;   // the stepped-simulation clock used by the dev harness
 const hud = {
   gems: document.getElementById('gemCount'),
   time: document.getElementById('timeVal'),
@@ -1912,7 +2129,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
   started = true;
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   grabPointer();
-  toast('Follow the stairs up the tower');
+  toast('Climb all twenty floors - the crown is at the top');
 });
 // ---------- hero picker ----------
 const heroButtons = Array.from(document.querySelectorAll('#heroPick .hero'));
@@ -1995,10 +2212,10 @@ function tick() {
     }
   }
   goal.rotation.y += dt * 0.9;
-  goal.position.y = TOWER_TOP + 3.4 + Math.sin(t * 1.6) * 0.22;
+  goal.position.y = GOAL_Y + Math.sin(t * 1.6) * 0.22;
   goalLight.intensity = 2.0 + Math.sin(t * 3) * 0.5;
 
-  moveWorld(t);
+  moveWorld(dt, t);
 
   if (started && !devPause) { step(dt); updateEnemies(dt, t); updateBolts(dt); }
 
@@ -2061,12 +2278,13 @@ function tick() {
   ray.set(camTarget, dir.normalize());
   ray.far = dist;
   const hits = ray.intersectObjects(solidMeshes, false);
-  const useDist = hits.length ? Math.max(2.6, hits[0].distance - 0.5) : dist;
+  const useDist = hits.length ? Math.max(1.1, hits[0].distance - 0.45) : dist;   // indoors the camera must stay inside the room
   camPos.copy(camTarget).addScaledVector(dir, useDist);
   camera.position.lerp(camPos, 1 - Math.pow(0.0005, dt));
   camera.lookAt(camTarget);
 
-  sun.position.set(player.pos.x + 48, player.pos.y + 92, player.pos.z + 40);
+  sun.position.set(player.pos.x + 28, player.pos.y + 60, player.pos.z + 46);
+  lamp.position.set(player.pos.x, player.pos.y + 2.2, player.pos.z);
   sun.target.position.copy(player.pos);
 
   // ----- the hero picker's live figures, only while it is on screen -----
@@ -2079,7 +2297,7 @@ function tick() {
   const h = Math.max(0, player.pos.y);
   hud.height.textContent = h.toFixed(0);
   hud.time.textContent = formatTime(time);
-  const pct = clamp(h / (TOWER_TOP + 4), 0, 1) * 100;
+  const pct = clamp(h / (GOAL_Y + 1), 0, 1) * 100;
   hud.fill.style.height = pct + '%';
   hud.pip.style.bottom = pct + '%';
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.classList.remove('show'); }
@@ -2089,10 +2307,22 @@ function tick() {
 
 /** Advances every solid that moves. Kept separate from rendering so the
     physics can be stepped on its own. */
-function moveWorld(t) {
+function moveWorld(dt, t) {
   for (const s of solids) s.prev.copy(s.obj.position);
   for (const m of movers) {
     m.obj.position[m.axis] = m.base[m.axis] + Math.sin(t * m.speed * 1.6 + m.phase) * m.amp;
+  }
+  // doors stand open while somebody is close enough to push through
+  for (const d of doors) {
+    const near = Math.hypot(player.pos.x - d.hx, player.pos.z - d.hz) < 5.5 &&
+                 Math.abs(player.pos.y - d.y) < 5;
+    const want = near ? d.open : d.closed;
+    if (Math.abs(want - d.a) > 0.001) {
+      d.a += (want - d.a) * Math.min(1, 5 * dt);
+      placeDoor(d);
+    }
+    // solid only while shut - a swinging panel must never push the player around
+    d.col.off = Math.abs(d.a - d.closed) > 0.12;
   }
 }
 
@@ -2363,22 +2593,39 @@ if (location.hash.indexOf('dev') >= 0) {
     enemies, attack, bolts, shoot: fireRepulsor,
     heroes: HEROES, pickHero, currentHero: () => hero.id,
     previewLeg: i => pFigs[i].pLegL.rotation.x,
-    clearEnemies() { for (const e of enemies) { e.dead = true; e.respawnT = 1e9; e.obj.visible = false; } },
-    // live positions, so tests follow the moving platforms rather than their base points
-    waypoints() {
-      const pts = [{ x: LAND_X, y: LAND_TOP, z: LAND_Z }];
-      for (const m of courseMeshes) pts.push({ x: m.position.x, y: m.position.y + 0.5, z: m.position.z });
-      const last = courseMeshes[courseMeshes.length - 1].position;
-      const edge = (TOWER + 3) / 2 - 1.4;                    // just inside the roof parapet
-      const k = Math.max(Math.abs(last.x), Math.abs(last.z)) || 1;
-      pts.push({ x: last.x / k * edge, y: TOWER_TOP + 1.2, z: last.z / k * edge });
-      return pts;
+    standing() {
+      const s = player.standingOn;
+      if (!s) return null;
+      return { x: +s.obj.position.x.toFixed(2), y: +s.obj.position.y.toFixed(2), z: +s.obj.position.z.toFixed(2),
+               hx: s.hx, hy: s.hy, hz: s.hz, tag: s.tag, top: +(s.obj.position.y + s.hy).toFixed(2) };
     },
+    doors,
+    probe(x, y, z, pad) {
+      pad = pad || 0.6;
+      const hits = [];
+      for (const s of solids) {
+        const cp = s.obj.position;
+        const l = toLocal(x - cp.x, z - cp.z, s.rotY);
+        if (Math.abs(l.x) < s.hx + pad && Math.abs(y - cp.y) < s.hy + pad && Math.abs(l.z) < s.hz + pad) {
+          hits.push({ x: +cp.x.toFixed(2), y: +cp.y.toFixed(2), z: +cp.z.toFixed(2),
+                      w: +(s.hx * 2).toFixed(2), h: +(s.hy * 2).toFixed(2), d: +(s.hz * 2).toFixed(2),
+                      rotY: +s.rotY.toFixed(2), tag: s.tag });
+        }
+      }
+      return hits;
+    },
+    clearEnemies() { for (const e of enemies) { e.dead = true; e.respawnT = 1e9; e.obj.visible = false; } },
+    waypoints: () => ROUTE.map(p => ({
+      x: p.car ? p.car.position.x : p.x,
+      y: p.car ? p.car.position.y + 0.45 : p.y,
+      z: p.car ? p.car.position.z : p.z,
+      kind: p.kind || 'walk', note: p.note,
+    })),
     // deterministic physics stepping, independent of the render loop
     sim(frames, dt, held) {
-      let t = clock.elapsedTime;
+      if (simT === null) simT = clock.elapsedTime;
       if (held) for (const k of held) keys[k] = true;
-      for (let i = 0; i < frames; i++) { t += dt; moveWorld(t); step(dt); }
+      for (let i = 0; i < frames; i++) { simT += dt; moveWorld(dt, simT); step(dt); }
       if (held) for (const k of held) keys[k] = false;
       const p = player;
       return { x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2),

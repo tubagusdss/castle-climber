@@ -1,9 +1,18 @@
 # Castle Climber
 
 A small 3D run-and-jump platformer that runs in any browser. Pick a brick-built
-hero, then climb the spiral staircase around a candy-colored castle tower, hop
-the floating blocks, fight past the monsters and robots that guard the way, and
-claim the golden crown on the roof.
+hero and climb twenty storeys of a castle built around an open central shaft:
+galleries ring the void on every floor, so from the ground you can see all the
+way up to the skylight. Fight past the monsters and robots that patrol each
+gallery and claim the golden crown on the bridge at the top.
+
+**Getting up.** The way up changes every floor so the climb never settles into
+one rhythm: a flight of **stairs**, then chunky floating **blocks** to hop
+across the shaft, then a **lift** you wait for and ride, then a **ramp** you can
+sprint straight up. Galleries are strung with **blockers** to vault, springboards
+to bounce off, moving platforms across the void, and doors that swing open as you
+approach. Each floor is painted in its own colour, so the shaft reads as a stack
+of bands from bottom to top.
 
 **Heroes.** Iron Man (boot jets, cyan repulsor), Spider-Man (web shot),
 Captain America (shield on the arm), Wonder Girl (golden lasso) and Thor
