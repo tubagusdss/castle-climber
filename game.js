@@ -1033,6 +1033,120 @@ function selectHero(idx) {
 }
 selectHero(0);
 
+// ------------------------------------------------------------
+//  Live hero previews: one extra renderer draws all five figures
+//  into the picker row, each in its own scissored viewport, so the
+//  chooser shows the real characters running rather than thumbnails.
+// ------------------------------------------------------------
+const previewCanvas = document.getElementById('heroStage');
+const previewGrid = document.getElementById('heroPick');
+let pRenderer = null, pScene = null, pCam = null;
+const pFigs = [], pSlots = [];
+let pW = 0, pH = 0;
+
+function initHeroPreviews() {
+  if (!previewCanvas || pRenderer) return;
+  pRenderer = new THREE.WebGLRenderer({ canvas: previewCanvas, antialias: true, alpha: true });
+  pRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  pRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  pRenderer.setClearColor(0x000000, 0);
+  pRenderer.autoClear = false;
+
+  pScene = new THREE.Scene();
+  pScene.add(new THREE.HemisphereLight(0xffffff, 0x7a6aa0, 1.55));
+  const key = new THREE.DirectionalLight(0xfff3dc, 1.5);
+  key.position.set(3, 5, 6);
+  pScene.add(key);
+  const rim = new THREE.DirectionalLight(0x8fd7ff, 0.8);
+  rim.position.set(-5, 3, -4);
+  pScene.add(rim);
+
+  pCam = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
+
+  HEROES.forEach((h, i) => {
+    const parts = makeFigure(h.spec);
+    parts.group.position.set(i * 14, 0, 0);
+    parts.group.traverse(o => { if (o.isMesh) o.castShadow = false; });
+    pScene.add(parts.group);
+    pFigs.push(parts);
+    pSlots.push(document.querySelectorAll('#heroPick .hero')[i].querySelector('.figure'));
+  });
+}
+
+function animatePreviewFigure(f, i, t) {
+  const selected = HEROES[i].id === hero.id;
+  const gait = 6.2, phase = t * gait + i * 1.7;
+  const sw = Math.sin(phase) * 0.85;
+
+  f.pLegL.rotation.x = sw;        f.pLegR.rotation.x = -sw;
+  f.pArmL.rotation.x = -sw * 0.9; f.pArmR.rotation.x = sw * 0.9;
+  f.pArmL.rotation.z = 0.08;      f.pArmR.rotation.z = -0.08;
+  f.torso.position.y = TORSO_Y + Math.abs(Math.sin(phase)) * 0.05;
+  f.torso.rotation.y = 0;
+  f.group.rotation.y = Math.sin(t * 0.7 + i) * 0.55;
+  f.group.scale.setScalar(selected ? 1.0 : 0.84);
+  f.group.position.y = selected ? Math.abs(Math.sin(phase)) * 0.04 : -0.1;
+  if (f.cape) f.cape.rotation.x = -0.3 + Math.sin(t * 6 + i) * 0.08;
+  for (const th of f.thrusters) th.visible = false;
+
+  if (selected) {
+    // the chosen hero shows off: a punch, then a jump with the jets lit
+    const beat = t % 3.2;
+    if (beat < 0.5) {
+      const s = Math.sin((beat / 0.5) * Math.PI);
+      f.pArmR.rotation.x = -1.75 * s;
+      f.torso.rotation.y = -0.3 * s;
+    } else if (beat > 1.6 && beat < 2.5) {
+      const s = Math.sin(((beat - 1.6) / 0.9) * Math.PI);
+      f.group.position.y = s * 0.55;
+      f.pLegL.rotation.x = -0.35; f.pLegR.rotation.x = 0.18;
+      f.pArmL.rotation.x = 0.5;   f.pArmR.rotation.x = 0.5;
+      f.pArmL.rotation.z = 0.4;   f.pArmR.rotation.z = -0.4;
+      for (const th of f.thrusters) {
+        th.visible = true;
+        th.scale.set(1, 0.8 + s * 0.9, 1);
+      }
+    }
+  }
+}
+
+function renderHeroPreviews(t) {
+  if (!pRenderer) return;
+  const gr = previewGrid.getBoundingClientRect();
+  if (gr.width < 8 || gr.height < 8) return;
+
+  const w = Math.round(gr.width), h = Math.round(gr.height);
+  if (w !== pW || h !== pH) {
+    pW = w; pH = h;
+    pRenderer.setSize(w, h, false);
+  }
+
+  pRenderer.setScissorTest(false);
+  pRenderer.clear(true, true, true);
+  pRenderer.setScissorTest(true);
+
+  for (let i = 0; i < pFigs.length; i++) {
+    const r = pSlots[i].getBoundingClientRect();
+    const vw = r.width, vh = r.height;
+    if (vw < 2 || vh < 2) continue;
+    const vx = r.left - gr.left;
+    const vy = gr.bottom - r.bottom;
+
+    animatePreviewFigure(pFigs[i], i, t);
+
+    pRenderer.setViewport(vx, vy, vw, vh);
+    pRenderer.setScissor(vx, vy, vw, vh);
+    pCam.aspect = vw / vh;
+    pCam.updateProjectionMatrix();
+    const fx = pFigs[i].group.position.x;
+    pCam.position.set(fx, 0.12, 4.35);
+    pCam.lookAt(fx, -0.05, 0);
+    pRenderer.render(pScene, pCam);
+  }
+  pRenderer.setScissorTest(false);
+}
+initHeroPreviews();
+
 const player = {
   pos: SPAWN.clone(),
   vel: new THREE.Vector3(),
@@ -1290,6 +1404,7 @@ const hud = {
   lock: document.getElementById('lockon'),
   hearts: Array.from(document.querySelectorAll('#hearts .heart')),
 };
+const overlayEl = document.getElementById('overlay');
 
 function respawn(manual) {
   player.pos.copy(manual ? SPAWN : player.safe);
@@ -1470,6 +1585,9 @@ function tick() {
 
   sun.position.set(player.pos.x + 48, player.pos.y + 92, player.pos.z + 40);
   sun.target.position.copy(player.pos);
+
+  // ----- the hero picker's live figures, only while it is on screen -----
+  if (!overlayEl.classList.contains('hidden')) renderHeroPreviews(t);
 
   // ----- aim reticle and lock-on marker -----
   updateReticle();
@@ -1761,6 +1879,7 @@ if (location.hash.indexOf('dev') >= 0) {
     pause(v) { devPause = v !== false; },
     enemies, attack, bolts, shoot: fireRepulsor,
     heroes: HEROES, pickHero, currentHero: () => hero.id,
+    previewLeg: i => pFigs[i].pLegL.rotation.x,
     clearEnemies() { for (const e of enemies) { e.dead = true; e.respawnT = 1e9; e.obj.visible = false; } },
     // live positions, so tests follow the moving platforms rather than their base points
     waypoints() {
