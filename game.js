@@ -543,7 +543,9 @@ function pointSolid(v) {
 function findTarget() {
   const p = player;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  const ox = p.pos.x, oy = p.pos.y + 0.25, oz = p.pos.z;
+  const ox = p.pos.x + Math.cos(yaw) * SHOULDER;      // the reticle sights down the shoulder line
+  const oy = p.pos.y + 0.25;
+  const oz = p.pos.z - Math.sin(yaw) * SHOULDER;
   let best = null, bestDot = 0.86;
   for (const e of enemies) {
     if (e.dead) continue;
@@ -568,16 +570,26 @@ function fireRepulsor() {
   const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
   _mz.set(p.pos.x + fx * 0.7, p.pos.y + 0.25, p.pos.z + fz * 0.7);   // palm muzzle
 
-  // fire straight ahead, or onto whatever the reticle has locked
-  _aim.set(fx, 0, fz);
+  // Send the bolt through the point the reticle covers, so what you see under
+  // the crosshair is what you hit. A locked target overrides with a homing line.
+  _aim.copy(camTarget).sub(camera.position).normalize();
+  _aim.multiplyScalar(38).add(camera.position).sub(_mz).normalize();
+  // A locked bolt is aimed from the palm itself, not down the camera's sight
+  // line - the two are a shoulder-width apart, which misses at range.
   const locked = findTarget();
-  if (locked) _aim.set(locked.dir.x, locked.dir.y, locked.dir.z);
+  if (locked) {
+    const t = locked.e;
+    _aim.set(t.obj.position.x - _mz.x,
+             t.obj.position.y + t.height * 0.55 - _mz.y,
+             t.obj.position.z - _mz.z).normalize();
+  }
 
   const m = new THREE.Mesh(boltGeo, mat(0xbdf3ff, { emissive: 0x2ad4ff }));
   m.position.copy(_mz);
   m.lookAt(_mz.x + _aim.x, _mz.y + _aim.y, _mz.z + _aim.z);
   scene.add(m);
-  bolts.push({ obj: m, vel: _aim.clone().multiplyScalar(BOLT_SPEED), life: BOLT_LIFE });
+  bolts.push({ obj: m, vel: _aim.clone().multiplyScalar(BOLT_SPEED), life: BOLT_LIFE,
+               target: locked ? locked.e : null });
   burst(_mz, 0xbdf3ff, 3, 2.5);
 }
 
@@ -585,6 +597,20 @@ function updateBolts(dt) {
   for (let i = bolts.length - 1; i >= 0; i--) {
     const b = bolts[i];
     b.life -= dt;
+
+    // a locked bolt keeps tracking, so a walking enemy cannot simply stroll aside
+    if (b.target && !b.target.dead) {
+      const t = b.target;
+      _aim.set(t.obj.position.x - b.obj.position.x,
+               t.obj.position.y + t.height * 0.55 - b.obj.position.y,
+               t.obj.position.z - b.obj.position.z);
+      if (_aim.lengthSq() > 0.01) {
+        _aim.normalize().multiplyScalar(BOLT_SPEED);
+        b.vel.lerp(_aim, Math.min(1, 7 * dt));
+        b.obj.lookAt(b.obj.position.x + b.vel.x, b.obj.position.y + b.vel.y, b.obj.position.z + b.vel.z);
+      }
+    }
+
     b.obj.position.addScaledVector(b.vel, dt);
     b.obj.scale.z = 1 + Math.sin(clock.elapsedTime * 40) * 0.15;
 
@@ -851,7 +877,8 @@ addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // yaw 0 puts the camera south of the player, looking north at the tower
-let yaw = 0, pitch = 0.28, camDist = 11;
+let yaw = 0, pitch = 0.16, camDist = 11;
+const SHOULDER = 1.15;   // sideways camera offset, in world units
 const canvas = renderer.domElement;
 
 function grabPointer() {
@@ -1186,11 +1213,18 @@ function tick() {
   }
 
   // ----- camera -----
-  camTarget.set(player.pos.x, player.pos.y + 1.55, player.pos.z);   // aim point sits above the helmet
+  // Over-the-shoulder framing: the whole view slides sideways, so the hero sits
+  // left of centre and the reticle looks down open ground instead of their helmet.
+  const rx = Math.cos(yaw), rz = -Math.sin(yaw);          // camera right vector
+  camTarget.set(
+    player.pos.x + rx * SHOULDER,
+    player.pos.y + 1.3,
+    player.pos.z + rz * SHOULDER
+  );
   const cd = Math.cos(pitch) * camDist;
   desired.set(
     camTarget.x + Math.sin(yaw) * cd,
-    camTarget.y + Math.sin(pitch) * camDist + 1.4,
+    camTarget.y + Math.sin(pitch) * camDist + 0.9,
     camTarget.z + Math.cos(yaw) * cd
   );
   // pull in if a wall is between the camera and the player
