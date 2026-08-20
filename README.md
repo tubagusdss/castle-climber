@@ -1,8 +1,9 @@
 # Castle Climber
 
-A small 3D run-and-jump platformer that runs in any browser. Climb the spiral
-staircase around a candy-colored castle tower, hop the floating blocks, and
-claim the golden crown on the roof.
+A small 3D run-and-jump platformer that runs in any browser. Play a brick-built
+figure in red-and-gold armour: climb the spiral staircase around a candy-colored
+castle tower, hop the floating blocks, fight past the monsters and robots that
+guard the way, and claim the golden crown on the roof.
 
 **Play it:** https://tubagusdss.github.io/castle-climber/
 
@@ -14,11 +15,21 @@ claim the golden crown on the roof.
 | Jump | `Space` (press again mid-air to flip) | JUMP button |
 | Sprint | `Shift` | — |
 | Look around | move the mouse (click to lock the pointer) | drag the right half |
+| Repulsor blast | left click or `L` | BLAST button |
+| Punch | `J` | PUNCH button |
+| Kick | `K` or right click | KICK button |
 | Zoom | scroll wheel | — |
 | Restart | `R` | — |
 
 Miss a jump and you reappear on the last block you stood on, so a fall costs
 seconds rather than the whole climb.
+
+**Fighting.** Green monsters roam the courtyard and robots patrol the upper
+platforms; a bigger one guards the crown itself. Touching one costs a heart and
+knocks you back, so soften them up at range: the reticle turns red and brackets
+lock onto whatever your next blast will home in on. A punch does one point of
+damage, a blast one, a kick two. Beaten enemies come back after ten seconds, and
+every fifth gem repairs one heart.
 
 ## What's in the box
 

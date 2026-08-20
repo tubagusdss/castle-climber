@@ -69,6 +69,16 @@
   .stat .value small { font-family: var(--body); font-size: 12px; opacity: 0.6; font-weight: 500; }
   .stat.gems .value { color: var(--gold); }
   .stat.time .value { color: var(--sky); }
+  .stat.ko .value { color: var(--mint); }
+
+  /* armour hearts */
+  #hearts { display: flex; gap: 5px; align-items: center; }
+  .heart { width: 20px; height: 20px; transition: transform 0.18s ease; }
+  .heart svg { display: block; width: 100%; height: 100%; }
+  .heart .fill { fill: var(--red); }
+  .heart .edge { stroke: var(--ink); stroke-width: 1.6; }
+  .heart.off { transform: scale(0.82); }
+  .heart.off .fill { fill: rgba(255, 243, 220, 0.16); }
 
   /* ---------- climb gauge: a little tower on the right edge ---------- */
   .gauge {
@@ -135,6 +145,38 @@
     padding: 3px 7px; border-radius: 5px;
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
+
+  /* ---------- aim reticle ---------- */
+  #crosshair {
+    position: absolute; left: 50%; top: 50%;
+    width: 38px; height: 38px; margin: -19px 0 0 -19px;
+    opacity: 0; transition: opacity 0.3s ease, transform 0.12s ease;
+  }
+  body.playing #crosshair { opacity: 0.85; }
+  #crosshair svg { display: block; width: 100%; height: 100%; }
+  #crosshair .ring { fill: none; stroke: var(--cream); stroke-width: 1.6; opacity: 0.75; }
+  #crosshair .tick { stroke: var(--cream); stroke-width: 2.2; stroke-linecap: round; }
+  #crosshair .dot  { fill: var(--sky); }
+  #crosshair.locked { transform: scale(1.18); }
+  #crosshair.locked .ring, #crosshair.locked .tick { stroke: var(--red); opacity: 1; }
+  #crosshair.locked .dot { fill: var(--red); }
+
+  /* corner brackets that sit on the locked enemy */
+  #lockon {
+    position: absolute; left: 0; top: 0;
+    width: 60px; height: 60px; transform: translate(-50%, -50%);
+    opacity: 0; transition: opacity 0.12s ease;
+  }
+  #lockon.on { opacity: 1; }
+  #lockon i {
+    position: absolute; width: 30%; height: 30%;
+    border: 3px solid var(--red);
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45));
+  }
+  #lockon i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+  #lockon i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+  #lockon i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+  #lockon i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
 
   #toast {
     position: absolute; top: 84px; left: 50%; transform: translate(-50%, -10px);
@@ -246,6 +288,16 @@
     font-family: var(--display); font-size: 15px;
     border: none; box-shadow: 0 6px 0 #059c76;
   }
+  #punchBtn, #kickBtn, #blastBtn {
+    position: fixed; display: none; place-items: center;
+    width: 72px; height: 72px; border-radius: 50%; z-index: 6;
+    border: none; color: var(--ink);
+    font-family: var(--display); font-size: 12px;
+  }
+  #punchBtn { right: 138px; bottom: 62px;  background: var(--gold); box-shadow: 0 5px 0 #c79a34; }
+  #kickBtn  { right: 138px; bottom: 146px; background: var(--red);  box-shadow: 0 5px 0 #b3324f; color: var(--cream); }
+  #blastBtn { right: 40px;  bottom: 156px; background: var(--sky);  box-shadow: 0 5px 0 #2f93b4; }
+  body.touch #punchBtn, body.touch #kickBtn, body.touch #blastBtn { display: grid; }
   body.touch .hints { display: none; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -268,6 +320,24 @@
       <span>
         <span class="label">Gems</span><br>
         <span class="value"><span id="gemCount">0</span><small> / <span id="gemTotal">0</span></small></span>
+      </span>
+    </div>
+    <div class="stat armour">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2.6 20 5.4v6.2c0 5-3.4 8.4-8 9.8-4.6-1.4-8-4.8-8-9.8V5.4z" fill="none" stroke="#ef476f" stroke-width="2" stroke-linejoin="round"/></svg>
+      </span>
+      <span>
+        <span class="label">Armour</span><br>
+        <span id="hearts"><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span></span>
+      </span>
+    </div>
+    <div class="stat ko">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 11V7.5a1.6 1.6 0 0 1 3.2 0V11m0-1.2V6a1.6 1.6 0 0 1 3.2 0v3.8m0-1.2V6.6a1.6 1.6 0 0 1 3.2 0V11m0-2a1.6 1.6 0 0 1 3.2 0v4.6c0 4-2.6 6.8-6.6 6.8S6 19.6 6 15.6V11" fill="none" stroke="#06d6a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span>
+        <span class="label">Beaten</span><br>
+        <span class="value" id="koCount">0</span>
       </span>
     </div>
     <div class="stat time">
@@ -296,27 +366,44 @@
   <div class="hints">
     <span class="hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Run</span>
     <span class="hint"><kbd>Space</kbd> Jump &middot; twice to flip</span>
+    <span class="hint"><kbd>Click</kbd> / <kbd>L</kbd> Repulsor</span>
+    <span class="hint"><kbd>J</kbd> Punch</span>
+    <span class="hint"><kbd>K</kbd> / <kbd>Right-click</kbd> Kick</span>
     <span class="hint"><kbd>Shift</kbd> Sprint</span>
     <span class="hint"><kbd>Mouse</kbd> Look</span>
     <span class="hint"><kbd>R</kbd> Restart</span>
   </div>
+
+  <div id="crosshair">
+    <svg viewBox="0 0 38 38" aria-hidden="true">
+      <circle class="ring" cx="19" cy="19" r="12"/>
+      <path class="tick" d="M19 1.5v6M19 30.5v6M1.5 19h6M30.5 19h6"/>
+      <circle class="dot" cx="19" cy="19" r="2.2"/>
+    </svg>
+  </div>
+  <div id="lockon"><i></i><i></i><i></i><i></i></div>
 
   <div id="toast"></div>
 </div>
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jumpBtn">JUMP</button>
+<button id="punchBtn">PUNCH</button>
+<button id="kickBtn">KICK</button>
+<button id="blastBtn">BLAST</button>
 
 <div class="scrim" id="overlay">
   <div class="card">
     <div class="eyebrow">Climb the candy keep</div>
     <h1>Castle <span class="accent">Climber</span></h1>
-    <p class="lede">Race up the spiral stair, hop the floating blocks, and grab the golden crown at the very top. Miss a jump and you pop back to the last block you stood on &mdash; so keep going.</p>
+    <p class="lede">Race up the spiral stair, hop the floating blocks, and grab the golden crown at the very top. Monsters and robots guard the way &mdash; blast them with your repulsor, or punch and kick them clear. Miss a jump and you pop back to the last block you stood on.</p>
     <div class="keys">
       <span class="hint"><kbd>WASD</kbd> Run</span>
       <span class="hint"><kbd>Space</kbd> Jump</span>
       <span class="hint"><kbd>Space</kbd><kbd>Space</kbd> Double jump</span>
-      <span class="hint"><kbd>Shift</kbd> Sprint</span>
+      <span class="hint"><kbd>Click</kbd> Repulsor blast</span>
+      <span class="hint"><kbd>J</kbd> Punch</span>
+      <span class="hint"><kbd>K</kbd> Kick</span>
     </div>
     <button id="startBtn">Start climbing</button>
   </div>

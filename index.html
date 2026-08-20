@@ -69,6 +69,16 @@
   .stat .value small { font-family: var(--body); font-size: 12px; opacity: 0.6; font-weight: 500; }
   .stat.gems .value { color: var(--gold); }
   .stat.time .value { color: var(--sky); }
+  .stat.ko .value { color: var(--mint); }
+
+  /* armour hearts */
+  #hearts { display: flex; gap: 5px; align-items: center; }
+  .heart { width: 20px; height: 20px; transition: transform 0.18s ease; }
+  .heart svg { display: block; width: 100%; height: 100%; }
+  .heart .fill { fill: var(--red); }
+  .heart .edge { stroke: var(--ink); stroke-width: 1.6; }
+  .heart.off { transform: scale(0.82); }
+  .heart.off .fill { fill: rgba(255, 243, 220, 0.16); }
 
   /* ---------- climb gauge: a little tower on the right edge ---------- */
   .gauge {
@@ -135,6 +145,38 @@
     padding: 3px 7px; border-radius: 5px;
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   }
+
+  /* ---------- aim reticle ---------- */
+  #crosshair {
+    position: absolute; left: 50%; top: 50%;
+    width: 38px; height: 38px; margin: -19px 0 0 -19px;
+    opacity: 0; transition: opacity 0.3s ease, transform 0.12s ease;
+  }
+  body.playing #crosshair { opacity: 0.85; }
+  #crosshair svg { display: block; width: 100%; height: 100%; }
+  #crosshair .ring { fill: none; stroke: var(--cream); stroke-width: 1.6; opacity: 0.75; }
+  #crosshair .tick { stroke: var(--cream); stroke-width: 2.2; stroke-linecap: round; }
+  #crosshair .dot  { fill: var(--sky); }
+  #crosshair.locked { transform: scale(1.18); }
+  #crosshair.locked .ring, #crosshair.locked .tick { stroke: var(--red); opacity: 1; }
+  #crosshair.locked .dot { fill: var(--red); }
+
+  /* corner brackets that sit on the locked enemy */
+  #lockon {
+    position: absolute; left: 0; top: 0;
+    width: 60px; height: 60px; transform: translate(-50%, -50%);
+    opacity: 0; transition: opacity 0.12s ease;
+  }
+  #lockon.on { opacity: 1; }
+  #lockon i {
+    position: absolute; width: 30%; height: 30%;
+    border: 3px solid var(--red);
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.45));
+  }
+  #lockon i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+  #lockon i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+  #lockon i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+  #lockon i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
 
   #toast {
     position: absolute; top: 84px; left: 50%; transform: translate(-50%, -10px);
@@ -246,6 +288,16 @@
     font-family: var(--display); font-size: 15px;
     border: none; box-shadow: 0 6px 0 #059c76;
   }
+  #punchBtn, #kickBtn, #blastBtn {
+    position: fixed; display: none; place-items: center;
+    width: 72px; height: 72px; border-radius: 50%; z-index: 6;
+    border: none; color: var(--ink);
+    font-family: var(--display); font-size: 12px;
+  }
+  #punchBtn { right: 138px; bottom: 62px;  background: var(--gold); box-shadow: 0 5px 0 #c79a34; }
+  #kickBtn  { right: 138px; bottom: 146px; background: var(--red);  box-shadow: 0 5px 0 #b3324f; color: var(--cream); }
+  #blastBtn { right: 40px;  bottom: 156px; background: var(--sky);  box-shadow: 0 5px 0 #2f93b4; }
+  body.touch #punchBtn, body.touch #kickBtn, body.touch #blastBtn { display: grid; }
   body.touch .hints { display: none; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -268,6 +320,24 @@
       <span>
         <span class="label">Gems</span><br>
         <span class="value"><span id="gemCount">0</span><small> / <span id="gemTotal">0</span></small></span>
+      </span>
+    </div>
+    <div class="stat armour">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2.6 20 5.4v6.2c0 5-3.4 8.4-8 9.8-4.6-1.4-8-4.8-8-9.8V5.4z" fill="none" stroke="#ef476f" stroke-width="2" stroke-linejoin="round"/></svg>
+      </span>
+      <span>
+        <span class="label">Armour</span><br>
+        <span id="hearts"><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span><span class="heart"><svg viewBox="0 0 24 22" aria-hidden="true"><path class="fill edge" d="M12 20.5 3.6 12.4a5.4 5.4 0 1 1 8.4-6.7 5.4 5.4 0 1 1 8.4 6.7z"/></svg></span></span>
+      </span>
+    </div>
+    <div class="stat ko">
+      <span class="icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 11V7.5a1.6 1.6 0 0 1 3.2 0V11m0-1.2V6a1.6 1.6 0 0 1 3.2 0v3.8m0-1.2V6.6a1.6 1.6 0 0 1 3.2 0V11m0-2a1.6 1.6 0 0 1 3.2 0v4.6c0 4-2.6 6.8-6.6 6.8S6 19.6 6 15.6V11" fill="none" stroke="#06d6a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span>
+        <span class="label">Beaten</span><br>
+        <span class="value" id="koCount">0</span>
       </span>
     </div>
     <div class="stat time">
@@ -296,27 +366,44 @@
   <div class="hints">
     <span class="hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Run</span>
     <span class="hint"><kbd>Space</kbd> Jump &middot; twice to flip</span>
+    <span class="hint"><kbd>Click</kbd> / <kbd>L</kbd> Repulsor</span>
+    <span class="hint"><kbd>J</kbd> Punch</span>
+    <span class="hint"><kbd>K</kbd> / <kbd>Right-click</kbd> Kick</span>
     <span class="hint"><kbd>Shift</kbd> Sprint</span>
     <span class="hint"><kbd>Mouse</kbd> Look</span>
     <span class="hint"><kbd>R</kbd> Restart</span>
   </div>
+
+  <div id="crosshair">
+    <svg viewBox="0 0 38 38" aria-hidden="true">
+      <circle class="ring" cx="19" cy="19" r="12"/>
+      <path class="tick" d="M19 1.5v6M19 30.5v6M1.5 19h6M30.5 19h6"/>
+      <circle class="dot" cx="19" cy="19" r="2.2"/>
+    </svg>
+  </div>
+  <div id="lockon"><i></i><i></i><i></i><i></i></div>
 
   <div id="toast"></div>
 </div>
 
 <div id="stick"><div id="knob"></div></div>
 <button id="jumpBtn">JUMP</button>
+<button id="punchBtn">PUNCH</button>
+<button id="kickBtn">KICK</button>
+<button id="blastBtn">BLAST</button>
 
 <div class="scrim" id="overlay">
   <div class="card">
     <div class="eyebrow">Climb the candy keep</div>
     <h1>Castle <span class="accent">Climber</span></h1>
-    <p class="lede">Race up the spiral stair, hop the floating blocks, and grab the golden crown at the very top. Miss a jump and you pop back to the last block you stood on &mdash; so keep going.</p>
+    <p class="lede">Race up the spiral stair, hop the floating blocks, and grab the golden crown at the very top. Monsters and robots guard the way &mdash; blast them with your repulsor, or punch and kick them clear. Miss a jump and you pop back to the last block you stood on.</p>
     <div class="keys">
       <span class="hint"><kbd>WASD</kbd> Run</span>
       <span class="hint"><kbd>Space</kbd> Jump</span>
       <span class="hint"><kbd>Space</kbd><kbd>Space</kbd> Double jump</span>
-      <span class="hint"><kbd>Shift</kbd> Sprint</span>
+      <span class="hint"><kbd>Click</kbd> Repulsor blast</span>
+      <span class="hint"><kbd>J</kbd> Punch</span>
+      <span class="hint"><kbd>K</kbd> Kick</span>
     </div>
     <button id="startBtn">Start climbing</button>
   </div>
@@ -716,44 +803,445 @@ goalLight.position.set(0, TOWER_TOP + 5, 0);
 scene.add(goalLight);
 
 // ============================================================
-//  PLAYER (blocky avatar)
+//  ENEMIES - lumbering monsters and patrolling robots
+//  They never block movement; they bump you for a heart and can be
+//  punched or kicked off their perch.
+// ============================================================
+const enemies = [];
+let defeated = 0;
+
+const MON  = { skin: 0x7bc950, dark: 0x4f9e2f, belly: 0xd9f2a3, horn: 0xfff3dc, eye: 0xffd166 };
+const BOT  = { shell: 0x9aa7b8, dark: 0x6d7c92, trim: 0xef476f, eye: 0x4cc9f0 };
+
+function bodyPart(g, w, h, d, x, y, z, color, o = {}) {
+  const m = new THREE.Mesh(boxGeo, mat(color, o));
+  m.scale.set(w, h, d);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  g.add(m);
+  return m;
+}
+
+/** kind: 'monster' | 'robot'. (x, y, z) is where its feet stand. */
+function spawnEnemy(kind, x, y, z, o = {}) {
+  const g = new THREE.Group();
+  const s = o.scale || 1;
+  let hp, radius, height;
+
+  if (kind === 'monster') {
+    hp = 2; radius = 0.85; height = 1.95;
+    bodyPart(g, 1.24, 0.98, 0.98, 0, 0.66, 0, MON.skin);              // body
+    bodyPart(g, 0.86, 0.44, 0.20, 0, 0.52, 0.46, MON.belly);          // belly patch
+    bodyPart(g, 1.02, 0.56, 0.86, 0, 1.40, 0.04, MON.dark);           // head
+    bodyPart(g, 0.20, 0.40, 0.20, -0.30, 1.80, 0, MON.horn);          // horns
+    bodyPart(g, 0.20, 0.40, 0.20, 0.30, 1.80, 0, MON.horn);
+    bodyPart(g, 0.17, 0.17, 0.09, -0.23, 1.50, 0.45, MON.eye, { emissive: 0x6b5200 });
+    bodyPart(g, 0.17, 0.17, 0.09, 0.23, 1.50, 0.45, MON.eye, { emissive: 0x6b5200 });
+    for (let i = -1; i <= 1; i++) bodyPart(g, 0.13, 0.17, 0.07, i * 0.25, 1.24, 0.45, 0xfffdf5);  // teeth
+    bodyPart(g, 0.44, 0.32, 0.62, -0.34, 0.16, 0.06, MON.dark);       // feet
+    bodyPart(g, 0.44, 0.32, 0.62, 0.34, 0.16, 0.06, MON.dark);
+    bodyPart(g, 0.30, 0.72, 0.32, -0.78, 0.76, 0, MON.dark);          // arms
+    bodyPart(g, 0.30, 0.72, 0.32, 0.78, 0.76, 0, MON.dark);
+  } else {
+    hp = 3; radius = 0.80; height = 2.30;
+    bodyPart(g, 0.30, 0.62, 0.34, -0.28, 0.31, 0, BOT.dark);          // legs
+    bodyPart(g, 0.30, 0.62, 0.34, 0.28, 0.31, 0, BOT.dark);
+    bodyPart(g, 0.42, 0.14, 0.52, -0.28, 0.07, 0.06, BOT.shell);      // feet
+    bodyPart(g, 0.42, 0.14, 0.52, 0.28, 0.07, 0.06, BOT.shell);
+    bodyPart(g, 1.00, 0.86, 0.68, 0, 1.06, 0, BOT.shell);             // chassis
+    bodyPart(g, 1.04, 0.13, 0.72, 0, 1.06, 0, BOT.trim);              // warning stripe
+    bodyPart(g, 0.26, 0.26, 0.10, 0, 0.86, 0.36, BOT.eye, { emissive: 0x0b4a63 });  // core light
+    bodyPart(g, 0.76, 0.52, 0.62, 0, 1.72, 0, BOT.dark);              // head
+    bodyPart(g, 0.60, 0.17, 0.09, 0, 1.74, 0.33, BOT.eye, { emissive: 0x0b4a63 });  // visor
+    bodyPart(g, 0.08, 0.38, 0.08, 0, 2.14, 0, BOT.shell);             // antenna
+    bodyPart(g, 0.19, 0.19, 0.19, 0, 2.38, 0, BOT.trim, { emissive: 0x5c0f22 });
+    bodyPart(g, 0.26, 0.70, 0.30, -0.66, 1.06, 0, BOT.dark);          // arms
+    bodyPart(g, 0.26, 0.70, 0.30, 0.66, 1.06, 0, BOT.dark);
+    bodyPart(g, 0.32, 0.24, 0.36, -0.66, 0.62, 0.02, BOT.shell);      // claws
+    bodyPart(g, 0.32, 0.24, 0.36, 0.66, 0.62, 0.02, BOT.shell);
+  }
+
+  g.scale.setScalar(s);
+  g.position.set(x, y, z);
+  scene.add(g);
+
+  const e = {
+    kind, obj: g, scale: s,
+    hp: Math.round(hp * (o.hpMul || 1)), maxHp: Math.round(hp * (o.hpMul || 1)),
+    home: new THREE.Vector3(x, y, z),
+    radius: radius * s, height: height * s,
+    speed: (kind === 'monster' ? 3.2 : 4.0) * (o.speedMul || 1),
+    leash: o.leash ?? 4.0,
+    detect: o.detect ?? 8.5,
+    axis: o.axis || 'x', amp: o.amp ?? 2.2,
+    phase: Math.random() * 6.28, bob: Math.random() * 6.28,
+    vel: new THREE.Vector3(), hitT: 0, dead: false, respawnT: 0, face: 0,
+  };
+  enemies.push(e);
+  return e;
+}
+
+function reviveEnemy(e) {
+  e.dead = false;
+  e.hp = e.maxHp;
+  e.vel.set(0, 0, 0);
+  e.obj.position.copy(e.home);
+  e.obj.rotation.set(0, 0, 0);
+  e.obj.scale.setScalar(e.scale);
+  e.obj.visible = true;
+}
+
+function updateEnemies(dt, t) {
+  const pp = player.pos;
+  for (const e of enemies) {
+    const g = e.obj;
+
+    if (e.dead) {                       // spin, shrink, then come back later
+      e.respawnT -= dt;
+      g.rotation.y += dt * 11;
+      g.scale.multiplyScalar(Math.max(0, 1 - dt * 3.4));
+      if (g.scale.x < 0.02) g.visible = false;
+      if (e.respawnT <= 0) reviveEnemy(e);
+      continue;
+    }
+
+    g.position.addScaledVector(e.vel, dt);          // knockback carry
+    e.vel.multiplyScalar(Math.max(0, 1 - 6 * dt));
+
+    const dx = pp.x - g.position.x, dz = pp.z - g.position.z;
+    const dy = pp.y - e.home.y;
+    const dist = Math.hypot(dx, dz) || 0.0001;
+    const hunting = dist < e.detect && dy > -2.2 && dy < 3.4;
+
+    let mx = 0, mz = 0;
+    if (hunting && dist > 0.8) {
+      mx = dx / dist; mz = dz / dist;
+    } else {                                        // patrol around home
+      const target = e.home[e.axis] + Math.sin(t * 0.55 + e.phase) * e.amp;
+      const tx = e.axis === 'x' ? target : e.home.x;
+      const tz = e.axis === 'z' ? target : e.home.z;
+      const ax = tx - g.position.x, az = tz - g.position.z;
+      const ad = Math.hypot(ax, az);
+      if (ad > 0.15) { mx = ax / ad; mz = az / ad; }
+    }
+    const sp = (hunting ? e.speed : e.speed * 0.5) * dt;
+    g.position.x += mx * sp;
+    g.position.z += mz * sp;
+
+    // stay tethered to the deck it guards
+    const hx = g.position.x - e.home.x, hz = g.position.z - e.home.z;
+    const hd = Math.hypot(hx, hz);
+    if (hd > e.leash) {
+      g.position.x = e.home.x + hx / hd * e.leash;
+      g.position.z = e.home.z + hz / hd * e.leash;
+      e.vel.multiplyScalar(0.4);
+    }
+
+    if (mx || mz) e.face = Math.atan2(mx, mz);
+    let turn = e.face - g.rotation.y;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    g.rotation.y += turn * Math.min(1, 9 * dt);
+
+    e.bob += dt * (hunting ? 9 : 4.5);
+    g.position.y = e.home.y + Math.abs(Math.sin(e.bob)) * 0.13 * e.scale;
+    g.rotation.z = Math.sin(e.bob) * 0.05;
+
+    if (e.hitT > 0) {
+      e.hitT -= dt;
+      g.scale.setScalar(e.scale * (1 + Math.max(0, e.hitT) * 1.1));
+    }
+
+    if (player.invuln <= 0 && !won &&
+        dist < e.radius + 0.75 && Math.abs(pp.y - e.home.y) < e.height) hurtPlayer(e);
+  }
+}
+
+
+// ---------- repulsor blasts ----------
+const bolts = [];
+const boltGeo = new THREE.BoxGeometry(0.26, 0.26, 0.85);
+const BOLT_SPEED = 44, BOLT_LIFE = 1.1;
+const _mz = new THREE.Vector3(), _aim = new THREE.Vector3();
+
+/** Is this point inside any solid block? Used to stop bolts at walls. */
+function pointSolid(v) {
+  for (let i = 0; i < solids.length; i++) {
+    const s = solids[i], cp = s.obj.position;
+    const l = toLocal(v.x - cp.x, v.z - cp.z, s.rotY);
+    if (Math.abs(l.x) < s.hx && Math.abs(v.y - cp.y) < s.hy && Math.abs(l.z) < s.hz) return true;
+  }
+  return false;
+}
+
+/** The enemy a blast fired right now would home onto, or null. */
+function findTarget() {
+  const p = player;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const ox = p.pos.x, oy = p.pos.y + 0.25, oz = p.pos.z;
+  let best = null, bestDot = 0.86;
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const dx = e.obj.position.x - ox, dz = e.obj.position.z - oz;
+    const dy = e.obj.position.y + e.height * 0.55 - oy;
+    const d = Math.hypot(dx, dy, dz);
+    if (d > 22) continue;
+    const dot = (dx / d) * fx + (dz / d) * fz;
+    if (dot > bestDot) { bestDot = dot; best = { e, d, dir: { x: dx / d, y: dy / d, z: dz / d } }; }
+  }
+  return best;
+}
+
+function fireRepulsor() {
+  const p = player;
+  if (!started || won || p.shootCool > 0) return;
+  p.shootCool = 0.26;
+  p.shootT = 0.2;
+  p.facing = yaw + Math.PI;                       // always fire where the camera looks
+  sfx.shoot();
+
+  const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
+  _mz.set(p.pos.x + fx * 0.7, p.pos.y + 0.25, p.pos.z + fz * 0.7);   // palm muzzle
+
+  // fire straight ahead, or onto whatever the reticle has locked
+  _aim.set(fx, 0, fz);
+  const locked = findTarget();
+  if (locked) _aim.set(locked.dir.x, locked.dir.y, locked.dir.z);
+
+  const m = new THREE.Mesh(boltGeo, mat(0xbdf3ff, { emissive: 0x2ad4ff }));
+  m.position.copy(_mz);
+  m.lookAt(_mz.x + _aim.x, _mz.y + _aim.y, _mz.z + _aim.z);
+  scene.add(m);
+  bolts.push({ obj: m, vel: _aim.clone().multiplyScalar(BOLT_SPEED), life: BOLT_LIFE });
+  burst(_mz, 0xbdf3ff, 3, 2.5);
+}
+
+function updateBolts(dt) {
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    const b = bolts[i];
+    b.life -= dt;
+    b.obj.position.addScaledVector(b.vel, dt);
+    b.obj.scale.z = 1 + Math.sin(clock.elapsedTime * 40) * 0.15;
+
+    let done = b.life <= 0;
+    if (!done) {
+      for (const e of enemies) {
+        if (e.dead) continue;
+        const dx = e.obj.position.x - b.obj.position.x;
+        const dz = e.obj.position.z - b.obj.position.z;
+        const dy = e.obj.position.y + e.height * 0.55 - b.obj.position.y;
+        if (Math.hypot(dx, dz) < e.radius + 0.7 && Math.abs(dy) < e.height * 0.7) {
+          const d = Math.hypot(dx, dz) || 1;
+          hitEnemy(e, 'blast', dx / d, dz / d);
+          done = true;
+          break;
+        }
+      }
+    }
+    if (!done && pointSolid(b.obj.position)) {
+      burst(b.obj.position, 0xbdf3ff, 5, 3);
+      done = true;
+    }
+    if (done) { scene.remove(b.obj); bolts.splice(i, 1); }
+  }
+}
+
+// ---------- the player's punch and kick ----------
+function attack(kind) {
+  const p = player;
+  if (!started || won || p.attackT > 0 || p.cool > 0) return;
+  p.attackType = kind;
+  p.attackDur = kind === 'kick' ? 0.34 : 0.24;
+  p.attackT = p.attackDur;
+  p.cool = p.attackDur + 0.10;
+  // standing still: swing where the camera is pointing
+  if (Math.hypot(p.vel.x, p.vel.z) < 1.5) p.facing = yaw + Math.PI;
+  sfx.swing(kind);
+
+  const reach = kind === 'kick' ? 2.5 : 2.1;
+  const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const dx = e.obj.position.x - p.pos.x, dz = e.obj.position.z - p.pos.z;
+    const d = Math.hypot(dx, dz) || 0.0001;
+    if (d > reach + e.radius) continue;
+    if (e.obj.position.y - p.pos.y > 2.2 || e.obj.position.y - p.pos.y < -2.8) continue;
+    if ((dx / d) * fx + (dz / d) * fz < 0.3) continue;      // must be in front
+    hitEnemy(e, kind, dx / d, dz / d);
+  }
+}
+
+function hitEnemy(e, kind, nx, nz) {
+  e.hp -= kind === 'kick' ? 2 : 1;
+  e.hitT = 0.2;
+  const power = kind === 'kick' ? 11 : kind === 'blast' ? 5 : 7;
+  e.vel.set(nx * power, 0, nz * power);
+  const at = e.obj.position.clone();
+  at.y += e.height * 0.6;
+  burst(at, e.kind === 'monster' ? MON.skin : BOT.eye, 10, 6);
+  sfx.hit();
+  if (e.hp <= 0) {
+    e.dead = true;
+    e.respawnT = 10;
+    defeated++;
+    hud.ko.textContent = String(defeated);
+    burst(at, C.gold, 18, 9);
+    sfx.ko();
+    toast(e.kind === 'monster' ? 'Monster down!' : 'Robot scrapped!');
+  }
+}
+
+function hurtPlayer(e) {
+  const p = player;
+  p.hp--;
+  p.invuln = 1.5;
+  const dx = p.pos.x - e.obj.position.x, dz = p.pos.z - e.obj.position.z;
+  const d = Math.hypot(dx, dz) || 1;
+  p.vel.x = dx / d * 12;
+  p.vel.z = dz / d * 12;
+  p.vel.y = 10;
+  p.grounded = false;
+  p.cut = false;
+  burst(new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), C.red, 12, 6);
+  sfx.hurt();
+  updateHearts();
+  if (p.hp <= 0) {
+    p.hp = 3;
+    updateHearts();
+    respawn(false);
+    toast('Knocked out - back to the last block');
+  } else {
+    toast(e.kind === 'monster' ? 'A monster bumped you!' : 'A robot zapped you!');
+  }
+}
+
+function updateHearts() {
+  for (let i = 0; i < hud.hearts.length; i++) {
+    hud.hearts[i].classList.toggle('off', i >= player.hp);
+  }
+}
+
+
+// ---------- where they stand guard ----------
+spawnEnemy('monster', 9.5, 0, 17.5, { axis: 'x', amp: 3.0, leash: 5.0 });
+spawnEnemy('monster', -9.5, 0, 15.0, { axis: 'z', amp: 3.0, leash: 5.0 });
+spawnEnemy('monster', 13.5, 0, 27.0, { axis: 'x', amp: 2.4, leash: 4.5 });
+spawnEnemy('monster', -7.0, 0, 8.0, { axis: 'z', amp: 2.4, leash: 4.5 });
+spawnEnemy('robot', -21.0, 0, -6.0, { axis: 'x', amp: 3.0, leash: 5.0 });
+
+// one on the landing at the top of the stairs
+spawnEnemy('robot', LAND_X - Math.sin(LAND_A) * 2.0, LAND_TOP, LAND_Z - Math.cos(LAND_A) * 2.0,
+           { axis: 'x', amp: 1.2, leash: 2.2, detect: 7 });
+
+// robots on the three widest course platforms, parked toward the outer edge
+for (const i of [3, 6, 12]) {
+  const p = coursePts[i];
+  const r = Math.hypot(p.x, p.z);
+  spawnEnemy('robot', p.x + p.x / r * 1.9, p.y + 0.5, p.z + p.z / r * 1.9,
+             { axis: 'x', amp: 1.0, leash: 1.5, detect: 6, speedMul: 0.85 });
+}
+
+// the big one guarding the crown
+spawnEnemy('robot', -3.8, TOWER_TOP + 1.2, -3.8,
+           { scale: 1.45, hpMul: 2, leash: 4.5, detect: 13, amp: 2.5, speedMul: 0.9 });
+
+// ============================================================
+//  PLAYER - a brick-built figure in red-and-gold armour
 // ============================================================
 const HX = 0.55, HY = 1.35, HZ = 0.55;   // collider half-extents
 const SPAWN = new THREE.Vector3(0, 2.2, 24);
 
+const SUIT = 0xd62828, SUIT_DARK = 0x9d1c22, PLATE = 0xf2b134, PLATE_LIT = 0xffd166;
+const ARC = 0xbdf3ff, ARC_GLOW = 0x1f9ad6, VISOR_GLOW = 0x2c7fa8;
+const TORSO_Y = 0.14;                    // rest height of the chest, bobbed while running
+
 const avatar = new THREE.Group();
-const skin = 0xffd98a, shirt = C.red, pants = C.sky;
-const torso = new THREE.Mesh(boxGeo, mat(shirt)); torso.scale.set(1.15, 1.35, 0.62); torso.position.y = 0.05;
-const head  = new THREE.Mesh(boxGeo, mat(skin));  head.scale.set(0.86, 0.8, 0.8);   head.position.y = 1.12;
-const armL  = new THREE.Mesh(boxGeo, mat(skin));  armL.scale.set(0.38, 1.25, 0.42);
-const armR  = armL.clone();
-const legL  = new THREE.Mesh(boxGeo, mat(pants)); legL.scale.set(0.44, 1.3, 0.46);
-const legR  = legL.clone();
-// pivots so limbs swing from the shoulder / hip
-function pivot(mesh, x, y) {
+
+/** A single brick. */
+function brick(w, h, d, x, y, z, color, o = {}) {
+  const m = new THREE.Mesh(boxGeo, mat(color, o));
+  m.scale.set(w, h, d);
+  m.position.set(x, y, z);
+  if (o.rotZ) m.rotation.z = o.rotZ;
+  if (o.rotX) m.rotation.x = o.rotX;
+  return m;
+}
+/** A round piece - minifig heads, studs, repulsors. */
+function round(r, h, seg, x, y, z, color, o = {}) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, o.rBot ?? r, h, seg), mat(color, o));
+  m.position.set(x, y, z);
+  if (o.rotX) m.rotation.x = o.rotX;
+  return m;
+}
+
+// ---- torso: chest, belt, gold plating and the chest light ----
+const torso = new THREE.Group();
+torso.position.y = TORSO_Y;
+torso.add(brick(1.00, 0.94, 0.58, 0, 0, 0, SUIT));                 // chest block
+torso.add(brick(1.06, 0.22, 0.64, 0, -0.42, 0, SUIT_DARK));        // hip flare of the torso
+torso.add(brick(0.56, 0.60, 0.08, 0, 0.10, 0.31, PLATE));          // gold breastplate
+torso.add(brick(0.90, 0.16, 0.10, 0, -0.14, 0.31, PLATE));         // ab band
+torso.add(brick(0.16, 0.70, 0.09, -0.42, 0.02, 0.30, PLATE_LIT));  // side stripes
+torso.add(brick(0.16, 0.70, 0.09, 0.42, 0.02, 0.30, PLATE_LIT));
+torso.add(round(0.24, 0.07, 12, 0, 0.20, 0.34, PLATE_LIT, { rotX: Math.PI / 2 }));   // reactor bezel
+torso.add(round(0.15, 0.09, 12, 0, 0.20, 0.37, ARC, { rotX: Math.PI / 2, emissive: ARC_GLOW }));
+torso.add(brick(0.30, 0.20, 0.30, -0.58, 0.34, 0, PLATE));         // shoulder pads
+torso.add(brick(0.30, 0.20, 0.30, 0.58, 0.34, 0, PLATE));
+torso.add(brick(0.44, 0.30, 0.14, 0, 0.12, -0.32, SUIT_DARK));     // back vent
+avatar.add(torso);
+
+// ---- head: helmet cylinder, gold faceplate, glowing slit eyes, top stud ----
+const head = new THREE.Group();
+head.position.y = 0.98;
+head.add(round(0.40, 0.62, 10, 0, 0, 0, SUIT));                    // helmet
+head.add(brick(0.54, 0.46, 0.20, 0, -0.02, 0.30, PLATE));          // faceplate
+head.add(brick(0.50, 0.10, 0.10, 0, 0.22, 0.34, PLATE_LIT));       // brow ridge
+head.add(brick(0.13, 0.08, 0.06, -0.14, 0.06, 0.40, ARC, { emissive: VISOR_GLOW }));   // eye slits
+head.add(brick(0.13, 0.08, 0.06, 0.14, 0.06, 0.40, ARC, { emissive: VISOR_GLOW }));
+head.add(brick(0.30, 0.16, 0.12, 0, -0.20, 0.34, SUIT_DARK));      // mouth grille
+head.add(round(0.17, 0.13, 10, 0, 0.37, 0, SUIT));                 // minifig stud on top
+avatar.add(head);
+
+// ---- limbs on pivots so they swing from the shoulder / hip ----
+function pivot(obj, x, y) {
   const g = new THREE.Group();
   g.position.set(x, y, 0);
-  mesh.position.y = -0.62;
-  g.add(mesh);
+  g.add(obj);
   avatar.add(g);
   return g;
 }
-avatar.add(torso, head);
-const pArmL = pivot(armL, -0.78, 0.62), pArmR = pivot(armR, 0.78, 0.62);
-const pLegL = pivot(legL, -0.32, -0.62), pLegR = pivot(legR, 0.32, -0.62);
-// face
-const eyeGeo = new THREE.BoxGeometry(0.13, 0.17, 0.06);
-for (const s of [-1, 1]) {
-  const e = new THREE.Mesh(eyeGeo, mat(0x2b1b4a));
-  e.position.set(0.19 * s, 1.2, 0.42); avatar.add(e);
+function buildArm(side) {
+  const g = new THREE.Group();
+  g.add(brick(0.30, 0.60, 0.34, 0, -0.30, 0, SUIT));               // upper arm
+  g.add(brick(0.34, 0.16, 0.38, 0, -0.66, 0, PLATE));              // gauntlet cuff
+  g.add(brick(0.28, 0.24, 0.28, 0, -0.84, 0, SUIT_DARK));          // claw hand
+  g.add(round(0.10, 0.05, 10, 0, -0.97, 0, ARC, { emissive: ARC_GLOW }));  // palm repulsor
+  return g;
 }
-const smile = new THREE.Mesh(boxGeo, mat(0x2b1b4a)); smile.scale.set(0.36, 0.07, 0.06);
-smile.position.set(0, 0.98, 0.42); avatar.add(smile);
-// cape
-const cape = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.4), mat(C.gold, { side: THREE.DoubleSide }));
-cape.position.set(0, 0.05, -0.36); avatar.add(cape);
+function buildLeg() {
+  const g = new THREE.Group();
+  g.add(brick(0.38, 0.42, 0.42, 0, -0.20, 0, SUIT));               // thigh
+  g.add(brick(0.42, 0.10, 0.46, 0, -0.42, 0.02, PLATE_LIT));       // knee band
+  g.add(brick(0.44, 0.52, 0.56, 0, -0.60, 0.05, PLATE));           // tall gold boot
+  g.add(brick(0.46, 0.10, 0.60, 0, -0.82, 0.07, SUIT_DARK));       // sole
+  return g;
+}
+const pArmL = pivot(buildArm(-1), -0.64, 0.50), pArmR = pivot(buildArm(1), 0.64, 0.50);
+const pLegL = pivot(buildLeg(), -0.26, -0.50), pLegR = pivot(buildLeg(), 0.26, -0.50);
+
+// hip brick joining the legs
+avatar.add(brick(0.74, 0.24, 0.46, 0, -0.44, 0, SUIT_DARK));
+
+// ---- boot thrusters: parented to the legs so the flames track the boots ----
+const thrusters = [pLegL, pLegR].map(leg => {
+  const t = round(0.15, 0.5, 8, 0, -1.12, 0.05, ARC, { rBot: 0.02, emissive: ARC_GLOW, shadow: false });
+  t.visible = false;
+  leg.add(t);
+  return t;
+});
 
 avatar.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+for (const t of thrusters) t.castShadow = false;      // flames should not cast shadows
 avatar.position.copy(SPAWN);
 scene.add(avatar);
 
@@ -769,6 +1257,14 @@ const player = {
   animT: 0,
   spin: 0,
   cut: false,
+  hp: 3,
+  invuln: 0,
+  attackT: 0,
+  attackDur: 0.24,
+  attackType: 'punch',
+  cool: 0,
+  shootT: 0,
+  shootCool: 0,
   safe: SPAWN.clone(),
   safeT: 0,
 };
@@ -781,7 +1277,10 @@ addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (e.code === 'Space' && !keys[e.code]) player.buffer = 0.16;
   keys[e.code] = true;
-  if (e.code === 'KeyR') respawn(true);
+  if (e.code === 'KeyR') { player.hp = 3; updateHearts(); respawn(true); }
+  if (e.code === 'KeyJ') attack('punch');
+  if (e.code === 'KeyK') attack('kick');
+  if (e.code === 'KeyL') fireRepulsor();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -805,7 +1304,15 @@ addEventListener('mousemove', e => {
   }
 });
 let dragging = false;
-canvas.addEventListener('mousedown', () => { dragging = true; });
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  // once the pointer is locked the mouse buttons are free for fighting
+  if (document.pointerLockElement === canvas) {
+    if (e.button === 2) attack('kick');          // right-click kicks
+    else fireRepulsor();                          // left-click fires the repulsor
+  }
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('mouseup', () => { dragging = false; });
 addEventListener('wheel', e => { camDist = clamp(camDist + Math.sign(e.deltaY) * 0.9, 5, 22); }, { passive: true });
 
@@ -857,6 +1364,9 @@ canvas.addEventListener('touchcancel', endTouch, { passive: true });
 
 const jumpBtn = document.getElementById('jumpBtn');
 jumpBtn.addEventListener('touchstart', e => { e.preventDefault(); player.buffer = 0.16; }, { passive: false });
+document.getElementById('punchBtn').addEventListener('touchstart', e => { e.preventDefault(); attack('punch'); }, { passive: false });
+document.getElementById('kickBtn').addEventListener('touchstart', e => { e.preventDefault(); attack('kick'); }, { passive: false });
+document.getElementById('blastBtn').addEventListener('touchstart', e => { e.preventDefault(); fireRepulsor(); }, { passive: false });
 
 // ============================================================
 //  SOUND (tiny synth, no assets)
@@ -880,6 +1390,10 @@ const sfx = {
   pad:   () => beep(300, 0.22, 'sawtooth', 0.05, 700),
   hurt:  () => beep(220, 0.3, 'sawtooth', 0.05, -140),
   win:   () => [0, 130, 260, 420].forEach((d, i) => setTimeout(() => beep([523, 659, 784, 1047][i], 0.35, 'triangle', 0.07), d)),
+  swing: k => beep(k === 'kick' ? 240 : 320, 0.09, 'sawtooth', 0.035, -120),
+  shoot: () => { beep(1400, 0.09, 'square', 0.035, -900); setTimeout(() => beep(700, 0.07, 'triangle', 0.03, -400), 30); },
+  hit:   () => { beep(180, 0.09, 'square', 0.06, -80); setTimeout(() => beep(90, 0.12, 'sine', 0.05, -40), 40); },
+  ko:    () => [660, 495, 330].forEach((f, i) => setTimeout(() => beep(f, 0.16, 'square', 0.05, -60), i * 90)),
 };
 
 // ============================================================
@@ -979,6 +1493,10 @@ const hud = {
   fill: document.getElementById('gaugeFill'),
   pip: document.getElementById('gaugePip'),
   toast: document.getElementById('toast'),
+  ko: document.getElementById('koCount'),
+  cross: document.getElementById('crosshair'),
+  lock: document.getElementById('lockon'),
+  hearts: Array.from(document.querySelectorAll('#hearts .heart')),
 };
 
 function respawn(manual) {
@@ -1000,6 +1518,7 @@ function toast(msg) {
 
 document.getElementById('startBtn').addEventListener('click', () => {
   document.getElementById('overlay').classList.add('hidden');
+  document.body.classList.add('playing');
   started = true;
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   grabPointer();
@@ -1007,7 +1526,10 @@ document.getElementById('startBtn').addEventListener('click', () => {
 });
 document.getElementById('againBtn').addEventListener('click', () => {
   document.getElementById('winCard').classList.remove('show');
-  won = false; time = 0; collected = 0; falls = 0;
+  won = false; time = 0; collected = 0; falls = 0; defeated = 0;
+  hud.ko.textContent = '0';
+  player.hp = 3; player.invuln = 0; updateHearts();
+  for (const e of enemies) reviveEnemy(e);
   gems.forEach(g => { if (g.taken) { g.taken = false; g.obj.visible = true; } });
   hud.gems.textContent = '0';
   player.safe.copy(SPAWN);
@@ -1058,7 +1580,7 @@ function tick() {
 
   moveWorld(t);
 
-  if (started && !devPause) step(dt);
+  if (started && !devPause) { step(dt); updateEnemies(dt, t); updateBolts(dt); }
 
   // ----- particles -----
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -1082,6 +1604,12 @@ function tick() {
       hud.gems.textContent = String(collected);
       burst(g.obj.position, C.gold, 12, 6);
       sfx.gem();
+      // every fifth gem patches the armour back up
+      if (collected % 5 === 0 && player.hp < 3) {
+        player.hp++;
+        updateHearts();
+        toast('Armour repaired');
+      }
     }
   }
 
@@ -1093,7 +1621,7 @@ function tick() {
   }
 
   // ----- camera -----
-  camTarget.set(player.pos.x, player.pos.y + 1.3, player.pos.z);
+  camTarget.set(player.pos.x, player.pos.y + 1.55, player.pos.z);   // aim point sits above the helmet
   const cd = Math.cos(pitch) * camDist;
   desired.set(
     camTarget.x + Math.sin(yaw) * cd,
@@ -1114,6 +1642,9 @@ function tick() {
   sun.position.set(player.pos.x + 48, player.pos.y + 92, player.pos.z + 40);
   sun.target.position.copy(player.pos);
 
+  // ----- aim reticle and lock-on marker -----
+  updateReticle();
+
   // ----- HUD -----
   const h = Math.max(0, player.pos.y);
   hud.height.textContent = h.toFixed(0);
@@ -1133,6 +1664,35 @@ function moveWorld(t) {
   for (const m of movers) {
     m.obj.position[m.axis] = m.base[m.axis] + Math.sin(t * m.speed * 1.6 + m.phase) * m.amp;
   }
+}
+
+const _tv = new THREE.Vector3();
+function updateReticle() {
+  if (!started || won) {
+    hud.lock.classList.remove('on');
+    hud.cross.classList.remove('locked');
+    return;
+  }
+  const t = findTarget();
+  if (!t) {
+    hud.lock.classList.remove('on');
+    hud.cross.classList.remove('locked');
+    return;
+  }
+  _tv.set(t.e.obj.position.x, t.e.obj.position.y + t.e.height * 0.55, t.e.obj.position.z);
+  _tv.project(camera);
+  if (_tv.z > 1) {                       // behind the camera
+    hud.lock.classList.remove('on');
+    hud.cross.classList.remove('locked');
+    return;
+  }
+  const size = clamp(760 / Math.max(4, t.d), 30, 110);
+  hud.lock.style.width = size + 'px';
+  hud.lock.style.height = size + 'px';
+  hud.lock.style.left = ((_tv.x * 0.5 + 0.5) * innerWidth) + 'px';
+  hud.lock.style.top = ((-_tv.y * 0.5 + 0.5) * innerHeight) + 'px';
+  hud.lock.classList.add('on');
+  hud.cross.classList.add('locked');
 }
 
 function formatTime(s) {
@@ -1178,6 +1738,11 @@ function step(dt) {
   // --- jump ---
   p.buffer = Math.max(0, p.buffer - dt);
   p.coyote = Math.max(0, p.coyote - dt);
+  p.invuln = Math.max(0, p.invuln - dt);
+  p.attackT = Math.max(0, p.attackT - dt);
+  p.cool = Math.max(0, p.cool - dt);
+  p.shootT = Math.max(0, p.shootT - dt);
+  p.shootCool = Math.max(0, p.shootCool - dt);
   const wantJump = p.buffer > 0 || ((keys.Space) && p.grounded);
   if (wantJump) {
     if (p.grounded || p.coyote > 0) {
@@ -1290,17 +1855,52 @@ function step(dt) {
     pLegL.rotation.x = sw; pLegR.rotation.x = -sw;
     pArmL.rotation.x = -sw * 0.9; pArmR.rotation.x = sw * 0.9;
     pArmL.rotation.z = 0.08; pArmR.rotation.z = -0.08;
-    torso.position.y = 0.05 + Math.abs(Math.sin(p.animT * 2.4)) * 0.05 * Math.min(1, hspeed / 9);
+    torso.position.y = TORSO_Y + Math.abs(Math.sin(p.animT * 2.4)) * 0.05 * Math.min(1, hspeed / 9);
+    thrusters[0].visible = thrusters[1].visible = false;
   } else {
-    const up = p.vel.y > 0 ? 1 : 0.4;
-    pArmL.rotation.x = -2.1 * up; pArmR.rotation.x = -2.1 * up;
-    pArmL.rotation.z = 0.35; pArmR.rotation.z = -0.35;
-    pLegL.rotation.x = -0.5; pLegR.rotation.x = 0.35;
-    torso.position.y = 0.05;
+    // repulsor pose: arms swept out and back so the palms point at the ground
+    const rising = p.vel.y > 0;
+    pArmL.rotation.x = rising ? 0.5 : -0.3;  pArmR.rotation.x = rising ? 0.5 : -0.3;
+    pArmL.rotation.z = rising ? 0.40 : 0.85; pArmR.rotation.z = rising ? -0.40 : -0.85;
+    pLegL.rotation.x = -0.32; pLegR.rotation.x = 0.16;
+    torso.position.y = TORSO_Y;
+    const flare = (rising ? 1 : 0.45) * (0.8 + Math.random() * 0.35);
+    for (const t of thrusters) {
+      t.visible = true;
+      const w = 0.85 + flare * 0.25;
+      t.scale.set(w, flare * 1.5, w);
+      t.position.y = -1.12 - flare * 0.2;
+    }
   }
-  cape.rotation.x = -0.25 - clamp(hspeed / 26, 0, 0.5) + Math.sin(t2()) * 0.05;
+
+  // firing pose: right arm punched out, palm forward
+  if (p.shootT > 0) {
+    const s = Math.sin((1 - p.shootT / 0.2) * Math.PI) * 0.35 + 0.65;
+    pArmR.rotation.x = -1.55 - s * 0.12;
+    pArmR.rotation.z = -0.05;
+    pArmL.rotation.x = 0.25;
+  }
+
+  // a swing overrides the walk pose
+  if (p.attackT > 0) {
+    const swing = Math.sin((1 - p.attackT / p.attackDur) * Math.PI);
+    if (p.attackType === 'punch') {
+      pArmR.rotation.x = -1.75 * swing; pArmR.rotation.z = -0.12 * swing;
+      pArmL.rotation.x = 0.5 * swing;
+      torso.rotation.y = -0.35 * swing;
+    } else {
+      pLegR.rotation.x = -1.5 * swing;
+      pArmL.rotation.x = -0.9 * swing; pArmL.rotation.z = 0.5 * swing;
+      pArmR.rotation.z = -0.7 * swing;
+      torso.rotation.y = 0.25 * swing;
+    }
+  } else {
+    torso.rotation.y = 0;
+  }
+
+  // blink while the armour is still recovering from a hit
+  avatar.visible = p.invuln <= 0 || Math.sin(clock.elapsedTime * 34) > -0.3;
 }
-function t2() { return clock.elapsedTime * 6; }
 
 function winGame() {
   won = true;
@@ -1330,6 +1930,8 @@ if (location.hash.indexOf('dev') >= 0) {
     warp(x, y, z) { player.pos.set(x, y, z); player.vel.set(0, 0, 0); player.safe.set(x, y, z); },
     start() { document.getElementById('startBtn').click(); },
     pause(v) { devPause = v !== false; },
+    enemies, attack, bolts, shoot: fireRepulsor,
+    clearEnemies() { for (const e of enemies) { e.dead = true; e.respawnT = 1e9; e.obj.visible = false; } },
     // live positions, so tests follow the moving platforms rather than their base points
     waypoints() {
       const pts = [{ x: LAND_X, y: LAND_TOP, z: LAND_Z }];
