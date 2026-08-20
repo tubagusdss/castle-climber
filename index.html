@@ -604,9 +604,9 @@ const WOOD = 0x8d5524, WOOD_D = 0x6b4b2a;
 const RUG = 0xb3324f, WINDOW_LIT = 0xdff1ff;
 
 const FLOORS = 20;            // walkways stacked around the shaft
-const STOREY = 6.0;           // floor to floor
-const VOID = 11;              // half-width of the open shaft
-const RING = 21;              // half-width of the building
+const STOREY = 8.6;           // floor to floor - headroom to jump under
+const VOID = 13;              // half-width of the open shaft
+const RING = 27;              // half-width of the building (a 14-wide gallery)
 const SLAB_T = 0.7, WALL_T = 0.8, DOOR_W = 4.4, DOOR_H = 5.0;
 const PARAPET = 1.3;
 const floorY = n => n * STOREY;
@@ -630,12 +630,12 @@ function slabBox(cx, cz, w, d, top, color) {
   box(w, SLAB_T, d, cx, top - SLAB_T / 2, cz, color);
 }
 function tiles(cx, cz, w, d, top, a, b) {
-  const n = Math.floor(w / 3), m = Math.floor(d / 3);
+  const step = 5.4, n = Math.floor(w / step), m = Math.floor(d / step);
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < m; j++) {
       if ((i + j) % 2) continue;
-      box(2.7, 0.06, 2.7, cx - w / 2 + 1.5 + i * 3, top + 0.03, cz - d / 2 + 1.5 + j * 3,
-          a, { solid: false, shadow: false });
+      box(step - 0.5, 0.06, step - 0.5, cx - w / 2 + step / 2 + i * step, top + 0.03,
+          cz - d / 2 + step / 2 + j * step, a, { solid: false, shadow: false });
     }
   }
 }
@@ -755,8 +755,8 @@ const SIDES = [
   { ax: 'x', fixed: 1, sign: -1 },   // 2: south side, running west
   { ax: 'z', fixed: -1, sign: -1 },  // 3: west side, running north
 ];
-const STAIR_R = VOID - 2.2;          // the flights hang inside the shaft
-const STAIR_STEPS = 12, STAIR_RUN = 9.8, STAIR_W = 4.2;
+const STAIR_R = VOID - 2.6;          // the flights hang inside the shaft
+const STAIR_STEPS = 17, STAIR_RUN = 14.0, STAIR_W = 5.2;
 
 function sidePoint(side, along, radius) {
   const s = SIDES[side];
@@ -774,7 +774,7 @@ function buildAscent(n) {
   const y0 = floorY(n), y1 = floorY(n + 1);
   const kind = ascentOf(n);
   const pts = [];
-  const reach = kind === 'lift' ? 3.4 : STAIR_RUN / 2 + 1.6;
+  const reach = kind === 'lift' ? 4.6 : STAIR_RUN / 2 + 1.9;
   const foot = sidePoint(side, -reach * s.sign, STAIR_R);
   const head = sidePoint(side, reach * s.sign, STAIR_R);
   platform(foot.x, y0, foot.z, s.ax === 'x' ? 3.6 : STAIR_W, s.ax === 'x' ? STAIR_W : 3.6, b.deck);
@@ -796,29 +796,29 @@ function buildAscent(n) {
     for (let i = 0; i < cnt; i++) {
       const t = (i + 1) / (cnt + 1);
       const along = (-STAIR_RUN / 2 + t * STAIR_RUN) * s.sign;
-      const wob = i % 2 ? 1.5 : -1.5;
+      const wob = i % 2 ? 1.8 : -1.8;
       const p = sidePoint(side, along, STAIR_R + wob);
       const y = y0 + (y1 - y0) * t;
-      platform(p.x, y, p.z, 4.8, 4.8, i % 2 ? b.trim : band(n + 1).trim);
+      platform(p.x, y, p.z, 5.6, 5.6, i % 2 ? b.trim : band(n + 1).trim);
       pts.push({ x: p.x, y, z: p.z, kind: 'block' });
       if (i === 2) gem(p.x, y + 1.6, p.z);
     }
   } else if (kind === 'lift') {
     // a counterweighted lift: wait for the car, ride it, step off at the top
     const mid = sidePoint(side, 0, STAIR_R);
-    const car = platform(mid.x, (y0 + y1) / 2, mid.z, 4.6, 4.6, b.trim, { tag: 'mover' });
+    const car = platform(mid.x, (y0 + y1) / 2, mid.z, 4.0, 4.0, b.trim, { tag: 'mover' });
     movers.push({ obj: car, base: car.position.clone(), axis: 'y',
                   amp: (y1 - y0) / 2 + 0.55, speed: 0.34, phase: 0 });
     // guide rails and a lamp so it reads as a lift
     for (const o of [-1, 1]) {
-      const rail = sidePoint(side, o * 2.6, STAIR_R);
+      const rail = sidePoint(side, o * 2.3, STAIR_R);
       box(0.35, y1 - y0 + 2.4, 0.35, rail.x, (y0 + y1) / 2 + 0.6, rail.z, 0x6b6b7a, { solid: false });
     }
     box(1.2, 0.3, 1.2, mid.x, y1 + 0.4, mid.z, b.trim, { solid: false, emissive: 0x332200 });
     pts.push({ x: mid.x, y: (y0 + y1) / 2, z: mid.z, kind: 'lift', car });
   } else {
     // a ramp: shallow steps you can run straight up
-    const steps = 26, rise = (y1 - y0) / steps, depth = STAIR_RUN / steps;
+    const steps = 34, rise = (y1 - y0) / steps, depth = STAIR_RUN / steps;
     const from = -STAIR_RUN / 2 * s.sign;
     for (let i = 0; i < steps; i++) {
       const along = from + s.sign * (i + 0.5) * depth;
@@ -844,7 +844,7 @@ function parapet(n, side, open) {
   const r = VOID;
   const half = VOID;
   const y = floorY(n);
-  const segs = open ? [[-half, -8.2], [8.2, half]] : [[-half, half]];   // wide enough for the landings
+  const segs = open ? [[-half, -10.4], [10.4, half]] : [[-half, half]];  // wide enough for the landings
   const bd = band(n);
   for (const [a, b] of segs) {
     const mid = (a + b) / 2, len = b - a;
@@ -882,27 +882,27 @@ function buildFloor(n) {
     if (s.ax === 'x') {
       wall(-RING, s.fixed * (RING + WALL_T / 2), RING, s.fixed * (RING + WALL_T / 2), y, h, b.wall, gaps);
       box(RING * 2, 0.5, 0.4, 0, y + h - 0.4, s.fixed * RING, b.trim, { solid: false });
-      for (const wx of [-13, 13]) window_(wx, y + 3.0, s.fixed * RING, 2.2, 3.0, 0);
+      for (const wx of [-17, 0, 17]) window_(wx, y + 3.8, s.fixed * RING, 2.4, 4.4, 0);
     } else {
       wall(s.fixed * (RING + WALL_T / 2), -RING, s.fixed * (RING + WALL_T / 2), RING, y, h, b.wall, gaps);
       box(0.4, 0.5, RING * 2, s.fixed * RING, y + h - 0.4, 0, b.trim, { solid: false });
-      for (const wz of [-13, 13]) window_(s.fixed * RING, y + 3.0, wz, 2.2, 3.0, Math.PI / 2);
+      for (const wz of [-17, 0, 17]) window_(s.fixed * RING, y + 3.8, wz, 2.4, 4.4, Math.PI / 2);
     }
   }
 
   // corner pillars carry the gallery above
   for (const px of [-16.5, 16.5]) for (const pz of [-16.5, 16.5]) pillar(px, pz, y, STOREY);
 
-  // torches on the inner corners
-  for (const tx of [-VOID - 1.2, VOID + 1.2]) for (const tz of [-VOID - 1.2, VOID + 1.2]) {
-    torch(tx, y + 3.2, tz);
-  }
+  // a torch on two of the inner corners
+  const tc = n % 2 ? 1 : -1;
+  torch(tc * (VOID + 1.4), y + 3.4, VOID + 1.4);
+  torch(-tc * (VOID + 1.4), y + 3.4, -(VOID + 1.4));
 
   // banners hung from the gallery lip into the shaft
-  if (n > 0) {
+  if (n > 0 && n % 2 === 1) {
     for (const side of [0, 2]) {
-      const p = sidePoint(side, side === 0 ? -6.5 : 6.5, VOID - 0.4);
-      const bn = box(2.0, 3.4, 0.15, p.x, y - 1.9, p.z, b.trim, { solid: false });
+      const p = sidePoint(side, side === 0 ? -8.5 : 8.5, VOID - 0.4);
+      const bn = box(2.4, 4.4, 0.15, p.x, y - 2.5, p.z, b.trim, { solid: false });
       spinners.push({ obj: bn, wave: true, base: bn.position.clone(), phase: n });
     }
   }
@@ -949,8 +949,8 @@ for (let n = 0; n < FLOORS; n++) {
   // a couple of crates or barrels on the walkway
   const c = SIDES[(n + 1) % 4];
   const spot = sidePoint((n + 1) % 4, n % 2 ? 6 : -6, mid);
-  if (n % 3 === 0) { crate(spot.x, y, spot.z, 1.5); crate(spot.x + 1.7, y, spot.z, 1.2); }
-  else if (n % 3 === 1) { barrel(spot.x, y, spot.z); barrel(spot.x + 1.3, y, spot.z + 0.6); }
+  if (n % 4 === 0) { crate(spot.x, y, spot.z, 1.5); crate(spot.x + 1.7, y, spot.z, 1.2); }
+  else if (n % 4 === 2) { barrel(spot.x, y, spot.z); barrel(spot.x + 1.3, y, spot.z + 0.6); }
 
   // shelves and a table in the side rooms
   if (n % 5 === 3) {
@@ -974,7 +974,7 @@ for (let n = 0; n < FLOORS; n++) {
   }
 
   // a blocker across the walkway: vault it, or squeeze round the end
-  if (n > 0 && n % 2 === 0) {
+  if (n > 0 && n % 4 === 3) {
     const side = (n + 3) % 4, s = SIDES[side], mid2 = VOID + (RING - VOID) / 2;
     const p = sidePoint(side, 0, mid2);
     const bb = band(n);
@@ -2178,6 +2178,7 @@ document.getElementById('againBtn').addEventListener('click', () => {
 // ============================================================
 const clock = new THREE.Clock();
 const camTarget = new THREE.Vector3();
+let camY = null, camDistNow = 8;
 const ray = new THREE.Raycaster();
 const camPos = new THREE.Vector3();
 const desired = new THREE.Vector3();
@@ -2260,10 +2261,15 @@ function tick() {
   // ----- camera -----
   // Over-the-shoulder framing: the whole view slides sideways, so the hero sits
   // left of centre and the reticle looks down open ground instead of their helmet.
+  // Height is followed lazily - stairs raise the player in 0.5 steps and a rigid
+  // camera turns that staircase into a shudder.
   const rx = Math.cos(yaw), rz = -Math.sin(yaw);          // camera right vector
+  const wantY = player.pos.y + 1.3;
+  if (Math.abs(wantY - camY) > 4.5 || camY === null) camY = wantY;   // teleports, big falls
+  else camY += (wantY - camY) * (1 - Math.pow(player.grounded ? 0.0008 : 0.00002, dt));
   camTarget.set(
     player.pos.x + rx * SHOULDER,
-    player.pos.y + 1.3,
+    camY,
     player.pos.z + rz * SHOULDER
   );
   const cd = Math.cos(pitch) * camDist;
@@ -2278,9 +2284,15 @@ function tick() {
   ray.set(camTarget, dir.normalize());
   ray.far = dist;
   const hits = ray.intersectObjects(solidMeshes, false);
-  const useDist = hits.length ? Math.max(1.1, hits[0].distance - 0.45) : dist;   // indoors the camera must stay inside the room
-  camPos.copy(camTarget).addScaledVector(dir, useDist);
-  camera.position.lerp(camPos, 1 - Math.pow(0.0005, dt));
+  const wantDist = hits.length ? Math.max(1.1, hits[0].distance - 0.45) : dist;
+  // ease outwards, snap inwards: pillars flicking past must not yank the view
+  camDistNow = wantDist < camDistNow
+    ? wantDist
+    : camDistNow + (wantDist - camDistNow) * (1 - Math.pow(0.02, dt));
+  camPos.copy(camTarget).addScaledVector(dir, camDistNow);
+  // a respawn or a long fall should cut, not fly the camera through the building
+  if (camera.position.distanceToSquared(camPos) > 400) camera.position.copy(camPos);
+  else camera.position.lerp(camPos, 1 - Math.pow(0.0005, dt));
   camera.lookAt(camTarget);
 
   sun.position.set(player.pos.x + 28, player.pos.y + 60, player.pos.z + 46);
